@@ -34,6 +34,10 @@
   const COOLDOWN = 30000;                     // ms between signatures from one browser
   const LOCK    = 'ad-ledger-signed';
   const OFFLINE = 'The ledger is not answering. Nothing has been saved — try again in a moment.';
+  // TWO WORKS, TWO REGISTERS. The wall hangs a bingo card and a portrait; a signature is
+  // kept with the piece it was written about, so `work` is part of the row, not a filter
+  // invented on the client.
+  const WORK    = { bingo: 'Bingo', who: 'WHO' };
 
   const section   = document.getElementById('artLedger');
   if (!section) return;                        // the ledger is markup; without it there is no work
@@ -52,6 +56,10 @@
 
   let api = null, booting = null, busy = false, total = 0;
   const seen = new Set();                      // ids already painted, so an echo cannot double-insert
+  const tabs = Array.from(section.querySelectorAll('.ledger-tab'));
+  let work = 'bingo';                          // the register that is open
+  let db = null;                               // the client, kept so a tab switch can re-read
+  let workOk = true;                           // false only if the table has no `work` column
 
   // ── STATE + COPY ──────────────────────────────────────────────────────────
   // `data-state` is the whole contract with the outside world: idle before the room opens,
@@ -139,6 +147,10 @@
   // back at us and the seed's total must not be counted twice.
   function commit(entry, origin){
     if (!entry || !entry.id || seen.has(entry.id)) return false;
+    // a socket is not filtered by the read, so the row is checked against the open
+    // register here. A row with no `work` is a legacy row: the backfill made those
+    // `bingo`, so that is where it belongs.
+    if (workOk && (entry.work || 'bingo') !== work) return false;
     seen.add(entry.id);
     feedEl.prepend(row(entry));
     while (feedEl.children.length > FEED){
@@ -190,38 +202,72 @@
       live(false);
     }
   }
+  // ── READ — ONE WORK'S REGISTER ────────────────────────────────────────────
+  // `work` is selected as well as filtered, because the socket's rows have to be compared
+  // against it. If the column is genuinely absent (the migration has not been run) the
+  // read is retried without it and `workOk` goes false, so the client keeps working
+  // before the schema lands instead of showing an empty wall.
+  function cols(){ return workOk ? 'id,name,note,work,created_at' : 'id,name,note,created_at'; }
+  function missingWork(err){
+    const s = String((err && (err.code || '')) + ' ' + (err && (err.message || '')));
+    return /42703|PGRST204|column\s+"?work"?\s+does not exist/i.test(s);
+  }
+  function readWork(){
+    const once = function (){
+      let q = db.from(TABLE).select(cols(), { count: 'exact' });
+      if (workOk) q = q.eq('work', work);
+      return q.order('created_at', { ascending: false }).limit(FEED);
+    };
+    return once().then(function (res){
+      if (res.error && workOk && missingWork(res.error)){
+        workOk = false;
+        return once().then(function (again){ if (again.error) throw again.error; return again; });
+      }
+      if (res.error) throw res.error;
+      return res;
+    });
+  }
+  function seedRows(res){
+    // newest first from the server, so the seed is painted oldest-first and the list
+    // ends up exactly the way the socket will keep it
+    seen.clear();
+    feedEl.replaceChildren();
+    total = 0;
+    (res.data || []).slice().reverse().forEach(function (entry){ commit(entry, 'seed'); });
+    total = typeof res.count === 'number' ? res.count : (res.data || []).length;
+    paint();
+  }
   // ── BOOT — idempotent, and only ever from an open wall ────────────────────
   function boot(){
     if (booting) return booting;
     state('loading');
     booting = sdk()
       .then(function (ns){
-        const client = ns.createClient(PROJECT, KEY, {
+        db = ns.createClient(PROJECT, KEY, {
           // no session, no refresh, no URL parsing: a guestbook has no login, and a stale
           // auth token left in localStorage would turn a public table into a 401
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
         });
-        return client
-          .from(TABLE)
-          .select('id,name,note,created_at', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(FEED)
+        return readWork()
           .then(function (res){
-            if (res.error) throw res.error;
-            // newest first from the server, so the seed is painted oldest-first and the list
-            // ends up exactly the way the socket will keep it
-            (res.data || []).slice().reverse().forEach(function (entry){ commit(entry, 'seed'); });
-            total = typeof res.count === 'number' ? res.count : (res.data || []).length;
-            paint();
-            listen(client);
+            seedRows(res);
+            listen(db);
             return {
               insert: function (name, note){
-                return client
+                // the work rides with the signature; a row without it would belong to no
+                // register, and the table's check constraint would refuse the word anyway
+                const body = workOk ? { name: name, note: note, work: work } : { name: name, note: note };
+                return db
                   .from(TABLE)
-                  .insert({ name: name, note: note })
-                  .select('id,name,note,created_at')
+                  .insert(body)
+                  .select(cols())
                   .single()
                   .then(function (r){
+                    if (r.error && workOk && missingWork(r.error)){
+                      workOk = false;
+                      return db.from(TABLE).insert({ name: name, note: note }).select(cols()).single()
+                        .then(function (again){ if (again.error) throw again.error; return again.data; });
+                    }
                     if (r.error) throw r.error;
                     return r.data;
                   });
@@ -313,6 +359,37 @@
     if (nameEl.getAttribute('aria-invalid')) nameEl.setAttribute('aria-invalid', 'false');
   });
 
+  // ── THE REGISTER'S WORK ───────────────────────────────────────────────────
+  // One form, one feed, two registers. Switching does not reload the page or the SDK: it
+  // clears the wall, re-reads with the new key, and paints what comes back. While a
+  // signature is in flight a switch is refused, so the row always lands on the work that
+  // was open when the visitor pressed Send.
+  function refresh(){
+    if (!db) return;
+    seen.clear();
+    feedEl.replaceChildren();
+    total = 0;
+    paint();
+    return readWork().then(seedRows).catch(function (err){
+      section.dataset.error = String((err && (err.message || err.code)) || err).slice(0, 140);
+      say(OFFLINE, 'error');
+    });
+  }
+  function choose(next){
+    if (busy || !WORK[next] || next === work) return;
+    work = next;
+    section.dataset.work = work;
+    tabs.forEach(function (t){ t.setAttribute('aria-pressed', t.dataset.work === work ? 'true' : 'false'); });
+    say('');
+    // the room may still be fetching the SDK: the switch waits for the boot rather than
+    // leaving the wall on the other work's rows
+    if (db) refresh();
+    else if (booting) booting.then(function (){ if (db) refresh(); }, function (){});
+  }
+  tabs.forEach(function (t){
+    t.addEventListener('click', function (){ choose(t.dataset.work); });
+  });
+
   // THE ROOM OPENS ⇒ THE REGISTER IS WORTH LOADING. main.js dispatches this instead of
   // calling in here, so neither file has to know that the other exists.
   document.addEventListener('ad:wall', function (e){
@@ -325,4 +402,5 @@
 
   count();
   paint();
+  section.dataset.work = work;   // the stylesheet and the suite can both read which register is open
 })();
