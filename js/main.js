@@ -321,29 +321,44 @@ function debounce(func, wait) {
     timeout = setTimeout(later, wait);
   };
 }
-function animChars(){
-  const l1 = document.getElementById('line1');
-  if (!l1) return;
-  [['line1',0],['line2', l1.textContent.length*0.03+0.05]].forEach(([id,base]) => {
-    const el = document.getElementById(id);
-    const txt = el.textContent;
-    el.innerHTML = txt.split('').map((c,i) => `<span class="char" style="animation-delay:${(base+i*0.03).toFixed(3)}s">${c}</span>`).join('');
-  });
+// THE MASKED LINE REVEAL — the one place GSAP is used on the hero. Each line is already a child
+// of a .hero-line mask (clip-path, §06) sitting at translateY(110%); the tween only has to move
+// it to 0. `yPercent` is a transform, so the reveal cannot reflow the sheet, and the stagger is
+// the whole choreography: 0.15s between the two lines of a name.
+// NO GSAP, OR NO MOTION, IS NOT A DEGRADED HERO — it is the same hero, revealed in one frame.
+// The end state of the tween is `transform:none`, so the fallback writes exactly that, and the
+// stylesheet says the same thing under [data-motion="off"] and prefers-reduced-motion.
+function revealName(){
+  const nb = document.getElementById('nameBlock');
+  if (!nb) return;
+  const lines = nb.querySelectorAll('.hero-line > .name-line');
+  nb.style.opacity = '1';
+  if (window.gsap && lines.length && !stillMotion()){
+    // `y: 0` IS NOT REDUNDANT. The lines arrive with a CSS transform (translateY(110%)), and GSAP
+    // caches that computed matrix as y = 110% in px. Animating yPercent alone would then leave
+    // the cached y untouched and the line would finish exactly where it started — the one bug
+    // that looks like "the reveal never ran". Zeroing y in BOTH vars makes the percentage the
+    // only thing moving, and the end state is the true translate(0, 0).
+    window.gsap.fromTo(lines, { yPercent: 110, y: 0 }, {
+      yPercent: 0, y: 0, duration: 1.4, ease: 'expo.out', stagger: 0.15, overwrite: 'auto',
+    });
+  } else {
+    for (const line of lines) line.style.transform = 'none';
+  }
 }
 // Init on DOMContentLoaded, not window 'load': 'load' waits on every image, and 14 of the 19 images
 // on this page are eager (~2 MB total) — that held the name at opacity 0 for seconds on mobile.
 // Sizing runs twice: instantly on the metrics that are live, then re-fitted once the real Cormorant
-// Garamond faces are in. The font paths re-fit only — they never reveal again — because .char's
-// charUp (0.62s + per-char delays, done ~1.03s) starts the moment animChars() injects the spans,
-// so a reveal deferred to the fonts would silently eat the whole intro.
+// Garamond faces are in. The font paths re-fit only — they never reveal again — because the line
+// reveal starts the moment this runs (1.4s, 0.15s stagger), so a reveal deferred to the fonts
+// would silently eat the whole intro.
 let heroInited = false;
 function initHero(){
   const nb = document.getElementById('nameBlock');
-  if (heroInited || !nb) return;   // animChars() rewrites innerHTML — a second call restarts the stagger
+  if (heroInited || !nb) return;   // revealName() must run once: twice would restart the stagger
   heroInited = true;
   fitName();                       // size with whatever metrics are available right now
-  animChars();
-  nb.style.opacity = '1';          // same tick as animChars(), so the char intro is actually seen
+  revealName();
 }
 const refitHero = () => { if (heroInited) fitName(); };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initHero, { once: true });
@@ -361,22 +376,76 @@ if (document.fonts) {
 }
 window.addEventListener('resize', debounce(fitName, 100));
 
-// Cursor-as-light on hero photo
-const photoWrap = document.getElementById('photoWrap');
-const photoTinted = document.getElementById('photoTinted');
-if (photoWrap && photoTinted) {
-  let targetR=60, currentR=60;
-  document.addEventListener('mousemove', e => {
-    const rect = photoWrap.getBoundingClientRect();
-    const x = e.clientX - rect.left, y = e.clientY - rect.top;
-    const inside = x>=0 && x<=rect.width && y>=0 && y<=rect.height;
-    if (inside) {
-      photoTinted.style.setProperty('--x', (x/rect.width*100).toFixed(2)+'%');
-      photoTinted.style.setProperty('--y', (y/rect.height*100).toFixed(2)+'%');
-      targetR = 200;
-    } else { targetR = 60; }
+// THE PLATE'S PARALLAX — three passes at three depths, so the portrait is a stack of printed
+// layers rather than a photograph with an effect on it. The pointer's offset from the plate's
+// centre is normalised to -1..1 and each pass translates by depth × that number: 5 / 11 / 18px
+// at full deflection. It is one rAF loop that STOPS when it has caught up (no permanent frame
+// loop on a static hero), it never reads a rect inside the loop, and it composes with the reveal
+// because that tween owns the line, not the plate.
+// Motion off (or a coarse pointer, where there is no hover to read) parks all three passes at 0.
+const portraitStack = document.getElementById('photoWrap');
+const plateLayers = portraitStack ? Array.from(portraitStack.querySelectorAll('.pp-layer')) : [];
+const PLATE_DEPTH = [5, 11, 18];
+if (portraitStack && plateLayers.length){
+  let plateRaf = 0, plateX = 0, plateY = 0, wantX = 0, wantY = 0;
+  const drawPlate = () => {
+    plateX += (wantX - plateX) * 0.1;
+    plateY += (wantY - plateY) * 0.1;
+    const done = Math.abs(wantX - plateX) < 0.002 && Math.abs(wantY - plateY) < 0.002;
+    for (let i = 0; i < plateLayers.length; i++){
+      const d = PLATE_DEPTH[i] || 0;
+      plateLayers[i].style.transform =
+        'translate3d(' + (plateX * d).toFixed(2) + 'px,' + (plateY * d).toFixed(2) + 'px,0)';
+    }
+    plateRaf = done ? 0 : requestAnimationFrame(drawPlate);
+  };
+  const wakePlate = () => { if (!plateRaf) plateRaf = requestAnimationFrame(drawPlate); };
+  document.addEventListener('pointermove', e => {
+    if ((e.pointerType && e.pointerType !== 'mouse') || !hasFinePointer() || stillMotion()){
+      wantX = 0; wantY = 0; wakePlate(); return;
+    }
+    const r = portraitStack.getBoundingClientRect();
+    const nx = (e.clientX - (r.left + r.width / 2)) / Math.max(240, r.width / 2);
+    const ny = (e.clientY - (r.top + r.height / 2)) / Math.max(240, r.height / 2);
+    wantX = nx < -1 ? -1 : (nx > 1 ? 1 : nx);
+    wantY = ny < -1 ? -1 : (ny > 1 ? 1 : ny);
+    wakePlate();
+  }, { passive: true });
+  // the switch writes data-motion: when it goes off, the plate returns to rest in one pass
+  new MutationObserver(() => { if (stillMotion()){ wantX = 0; wantY = 0; wakePlate(); } })
+    .observe(rootEl, { attributes: true, attributeFilter: ['data-motion'] });
+}
+
+// THE SHEET'S CLOCK — the slug's last field, ticking once a second in Gulf time (the coordinates
+// printed beside it are Sharjah's). It is a detail of the printed object, so it is aria-hidden in
+// the markup and it stops for the two audiences that asked for stillness: a hidden tab and a
+// visitor who turned Motion off (§14). Nothing here writes layout — one text node per second.
+const sheetClock = document.getElementById('heroClock');
+if (sheetClock){
+  let clockTimer = 0;
+  let clockFmt = null;
+  try {
+    clockFmt = new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Dubai',
+    });
+  } catch (e) { clockFmt = null; }              // a browser without IANA zones: local time
+  const readClock = () => {
+    try { return clockFmt ? clockFmt.format(new Date()) : new Date().toTimeString().slice(0, 8); }
+    catch (e) { return new Date().toTimeString().slice(0, 8); }
+  };
+  const tickClock = () => { sheetClock.textContent = readClock(); };
+  const startClock = () => {
+    if (clockTimer || stillMotion()) return;
+    tickClock();
+    clockTimer = setInterval(tickClock, 1000);
+  };
+  const stopClock = () => { clearInterval(clockTimer); clockTimer = 0; };
+  startClock();
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopClock(); else startClock();
   });
-  (function animR(){ currentR += (targetR-currentR)*0.08; photoTinted.style.setProperty('--r', currentR.toFixed(1)+'px'); requestAnimationFrame(animR); })();
+  new MutationObserver(() => { if (stillMotion()) stopClock(); else startClock(); })
+    .observe(rootEl, { attributes: true, attributeFilter: ['data-motion'] });
 }
 
 // ═══════════════════════════════════════════════════
@@ -1733,6 +1802,38 @@ if (bingoWrap) {
   const menu    = document.getElementById('navMenu');
   const rows    = Array.from(document.querySelectorAll('[data-nav-for]'));
   const sections = Array.from(document.querySelectorAll('[data-nav]'));
+  // §06b — the signboard this bar is handed from, and the drawer whose open state outranks the
+  // handoff (a focused control may never be invisible). Both looked up here, before the first
+  // frame, because frame() reads all three on every scroll.
+  const strip    = document.getElementById('marqueeToc');
+  const stripTrack = document.getElementById('marqueeTrack');
+  const drawer   = document.getElementById('setPanel');
+  // BEFORE THE FIRST FRAME THE BAR IS NOT ON THE PAGE. The handoff writes opacity from scroll
+  // position, and at scrollY 0 that answer is 0 — so the start state is written here, in the
+  // parse, rather than left for the first animation frame to discover after a visible flash.
+  // No script at all means the style is never touched and the bar is simply there (<noscript>
+  // is not needed for that: nothing in the stylesheet hides it).
+  if (bar) bar.style.opacity = '0';
+
+  // ── THE PROGRESS TRACK (§05c) ───────────────────────────────────────
+  // Five segments, built from the same list the breadcrumb walks rather than authored a second
+  // time in the markup: one list of sections, so the rail and the label can never disagree about
+  // what the page is made of. The container is aria-hidden — this is the breadcrumb's answer
+  // drawn a second way, and a screen reader has no use for a picture of it.
+  const track = document.getElementById('pageProgress');
+  const segs = [], fills = [];
+  if (track){
+    for (const s of sections){
+      const seg  = document.createElement('span');
+      const leaf = document.createElement('span');
+      seg.className = 'pp-seg';
+      seg.dataset.ppFor = s.dataset.nav || '';
+      leaf.className = 'pp-fill';
+      seg.appendChild(leaf);
+      track.appendChild(seg);
+      segs.push(seg); fills.push(leaf);
+    }
+  }
 
   // ── THE TWO SWITCHES ────────────────────────────────────────────────
   // Both are <button aria-checked>, not checkboxes: a switch is a state, and the row around it
@@ -1767,10 +1868,12 @@ if (bingoWrap) {
 
   if (a11yBtn) a11yBtn.addEventListener('click', () => {
     a11y = !a11y; writePref(KEY_A11Y, a11y ? 'on' : 'off'); applyPrefs();
+    schedule();   // the rail's mode changed with the attribute: repaint it on the next frame
   });
   if (motionBtn) motionBtn.addEventListener('click', () => {
     if (a11y) return;   // the switch above has the wheel; the note under it says why
     motion = !motion; writePref(KEY_MOTION, motion ? 'on' : 'off'); applyPrefs();
+    schedule();
   });
 
 
@@ -1788,6 +1891,10 @@ if (bingoWrap) {
   let hide = false;                           // ...and the direction the bar is following
   let shownHidden = false, shownScrolled = false, shownId = '';
   let menuOpen = false;
+  // THE HANDOFF'S TWO ANSWERS (§06b), and the last opacity each surface was given. -1 is "never
+  // written", so the first frame always paints both sides exactly once.
+  let navFocus = false;                       // focus anywhere in the bar (keyboard, or the gear)
+  let shownNavOp = -1, shownStripOp = -1;
 
   // is the bar holding focus on behalf of a keyboard? (see the headroom block in frame())
   function keyboardInBar(){
@@ -1796,14 +1903,94 @@ if (bingoWrap) {
     try { return a.matches(':focus-visible'); } catch(e){ return true; }
   }
 
+  // FOCUS OUTRANKS THE FADE (§06b). The bar is transparent over the hero but it is still there,
+  // and a programmatic or keyboard focus inside it must bring it back — otherwise a focused
+  // control would be invisible, which is the one thing a handoff may never do. focusout is
+  // deferred one task so "focus moved to another control in the bar" is not read as "left".
+  if (bar){
+    bar.addEventListener('focusin', () => { navFocus = true; schedule(); });
+    bar.addEventListener('focusout', () => {
+      setTimeout(() => { navFocus = !!(bar.contains(document.activeElement)); schedule(); }, 0);
+    });
+  }
+
+  // ── THE TRACK'S ARITHMETIC ──────────────────────────────────────────
+  // One entry per section, reused every frame: this runs on scroll, so nothing in here allocates.
+  // `len` is a section's reading window in px of scroll travel — the positions during which that
+  // section is the one under the reading line — and `p` is how far the page has gone through it.
+  // The windows tile the page exactly (see the loop in frame()), so their lengths add up to the
+  // document and the rail's five lengths are the page, not an approximation of it.
+  const TOPS      = sections.map(() => 0);
+  const WIN       = sections.map(() => ({ start: 0, len: 1, p: 0 }));
+  const shownLen  = sections.map(() => -1);   // the flex-grow each segment was last given
+  const shownFill = sections.map(() => -1);   // ...and the scaleY each fill was last given
+  let shownSteps  = -1;                       // the count painted last while motion was off
+
+  // ONLY THE NUMBERS THAT CHANGED ARE WRITTEN. The fill is a transform for the same reason the
+  // bar's headroom is: scaleY is resolved on the compositor, so a scroll that moves the fill by a
+  // pixel never asks the page for a layout. Segment lengths move only when a section's geometry
+  // does — a resize, a late font, the hero's photograph arriving.
+  function setFill(i, v){
+    const q = Math.round((v > 0 ? (v < 1 ? v : 1) : 0) * 1000) / 1000;
+    if (shownFill[i] === q) return;
+    shownFill[i] = q;
+    if (fills[i]) fills[i].style.transform = 'scaleY(' + q + ')';
+  }
+
+  function paintTrack(completed){
+    if (!track) return;
+    for (let i = 0; i < segs.length; i++){
+      const len = Math.round(WIN[i].len);
+      if (len === shownLen[i]) continue;
+      shownLen[i] = len;
+      segs[i].style.flexGrow = String(len > 0 ? len : 1);
+    }
+    // MOTION OFF — or the system asking for less. The rail stops measuring and starts counting:
+    // the sections behind the reading line are full, the one under it is not, and nothing is
+    // written until that answer changes, so a page that asked for no movement gets no per-frame
+    // movement at all — one step at each section boundary. It still ends full, because the last
+    // window ends on the last scroll position, which is a section finished rather than entered.
+    if (stillMotion()){
+      if (completed === shownSteps) return;
+      shownSteps = completed;
+      for (let i = 0; i < fills.length; i++) setFill(i, i < completed ? 1 : 0);
+      return;
+    }
+    shownSteps = -1;
+    for (let i = 0; i < fills.length; i++) setFill(i, WIN[i].p);
+  }
+
   function frame(){
     const y = Math.max(0, window.scrollY);
     // READ: the section under the reading line. The sections are in document order, so the last
     // one whose top has passed the line is the one being read — no observer thresholds to fight,
-    // and a section taller than the viewport still reports itself.
+    // and a section taller than the viewport still reports itself. The same single walk of rects
+    // feeds the track below, so the page is measured once per frame and not twice.
     const line = window.innerHeight * LINE;
+    const maxScroll = Math.max(0, rootEl.scrollHeight - window.innerHeight);
     let active = sections.length ? sections[0] : null;
-    for (const s of sections){ if (s.getBoundingClientRect().top <= line) active = s; }
+    for (let i = 0; i < sections.length; i++){
+      const r = sections[i].getBoundingClientRect();
+      TOPS[i] = r.top + y;
+      if (r.top <= line) active = sections[i];
+    }
+    // ...and the windows those tops imply. Section i owns the line from the scroll position that
+    // first put its top on it to the one that puts the NEXT section's top there — which is why a
+    // section's window is its own height of travel and the windows tile the page with no gap.
+    // The first window starts at 0 and the last ends on the last scroll position, because the
+    // page cannot scroll past either end: that is what makes the rail empty at the top of the
+    // page and full at the bottom of it, instead of starting a third of the way in.
+    let completed = 0;
+    for (let i = 0; i < sections.length; i++){
+      const last  = i === sections.length - 1;
+      const start = Math.min(i === 0 ? 0 : Math.max(0, TOPS[i] - line), maxScroll);
+      const end   = last ? maxScroll : Math.max(start, Math.min(maxScroll, TOPS[i + 1] - line));
+      const len   = Math.max(1, end - start);
+      const p     = (y - start) / len;
+      WIN[i].start = start; WIN[i].len = len;
+      WIN[i].p = p > 1 ? 1 : (p > 0 ? p : 0);
+      if (p >= 1) completed++;
+    }
 
     // WRITE: the asterisk (§06) — one class on <html>, because the mark is not the only thing
     // that changes once the page has moved and the stylesheet already has the selector.
@@ -1837,6 +2024,33 @@ if (bingoWrap) {
     // The anchor is reset with it so the bar does not vanish the instant the reason goes away.
     if (menuOpen || keyboardInBar()){ hide = false; anchorY = y; }
     if (bar && hide !== shownHidden){ shownHidden = hide; bar.classList.toggle('nav-hidden', hide); }
+
+    // WRITE: THE HANDOFF (§06b) — one number, written twice. `dock` is how far the contents strip
+    // has risen through its own height: 0 while it is still below the fold, 1 the moment it is
+    // stuck to the top. The bar's opacity IS that number and the strip's type is its inverse, so
+    // there is exactly one surface at the top of the page at any scroll position, and neither
+    // fade is a transition — a transition would lag the wheel by its own duration.
+    // Three things hold the bar at 1 regardless of the scroll: its own list is open, focus is
+    // inside it (focusin/focusout above), or the modal drawer is open — its gear lives in the bar.
+    let dock = 1;
+    if (strip){
+      const sr = strip.getBoundingClientRect();
+      const sh = sr.height || 1;
+      dock = 1 - sr.top / sh;
+      dock = dock < 0 ? 0 : (dock > 1 ? 1 : dock);
+    }
+    if (menuOpen || navFocus || (drawer && drawer.open)) dock = 1;
+    if (bar && Math.abs(dock - shownNavOp) > 0.004){
+      shownNavOp = dock; bar.style.opacity = dock.toFixed(3);
+    }
+    if (stripTrack && Math.abs((1 - dock) - shownStripOp) > 0.004){
+      shownStripOp = 1 - dock; stripTrack.style.opacity = shownStripOp.toFixed(3);
+    }
+
+    // WRITE: the track (§05c) — every geometry READ is above it, and it is the one writer here
+    // that is allowed to do nothing at all: motion off, and no section boundary crossed since the
+    // last frame, means the rail is already the truth.
+    paintTrack(completed);
   }
 
   let queued = false;
@@ -1868,6 +2082,7 @@ if (bingoWrap) {
     // that closing the list cannot immediately re-hide it
     hide = false; anchorY = Math.max(0, window.scrollY);
     if (bar){ shownHidden = false; bar.classList.remove('nav-hidden'); }
+    schedule();   // an open list holds the bar at opacity 1 (§06b), even over the hero
   }
   function closeMenu(refocus){
     if (!menu || !menuOpen) return;
@@ -1875,6 +2090,7 @@ if (bingoWrap) {
     menu.hidden = true;
     if (bc) bc.setAttribute('aria-expanded', 'false');
     if (refocus && bc) bc.focus({ preventScroll: true });
+    schedule();
   }
 
   if (bc && menu){
@@ -1918,7 +2134,7 @@ if (bingoWrap) {
   // does not do is animate in — the panel is `[open]` before it can have a start state — so the
   // slide class waits a frame (§05b), and what it does not do is stop the page behind it from
   // scrolling, which is why it asks syncScrollLock() the same question the wall and the folio do.
-  const panel    = document.getElementById('setPanel');
+  const panel    = drawer;   // the same node — looked up at the top of the module, where frame() reads it
   const gear     = document.getElementById('setOpen');
   const setClose = document.getElementById('setClose');
   let closeTimer = 0;
@@ -1933,6 +2149,13 @@ if (bingoWrap) {
     else panel.setAttribute('open', '');   // Safari < 15.4: no top layer, but the panel does open
     requestAnimationFrame(() => panel.classList.add('is-open'));
     syncScrollLock();
+    // THE RETICLE MOVES INTO THE TOP LAYER (F2). #cur is position:fixed at z-index 9999, and a
+    // modal <dialog> paints in the top layer — above every z-index the page can write — so the
+    // mark would sit behind the drawer it is the cursor for. Re-parented, not cloned: there is
+    // one mark, the pointer loop keeps writing the same node's left/top, and it works in its new
+    // home with no second code path. [data-a11y="on"] still hides it wherever it lives (§14).
+    if (cur && cur.parentNode !== panel) panel.appendChild(cur);
+    schedule();   // the open drawer outranks the handoff: the bar comes back for its gear
     // showModal() already focuses the first control — the close button is deliberately first in
     // the markup — so this is a belt, not the braces: it also survives the fallback path above.
     if (setClose) setClose.focus({ preventScroll: true });
@@ -1947,7 +2170,12 @@ if (bingoWrap) {
       clearTimeout(closeTimer);
       if (!panel.open) return;
       if (typeof panel.close === 'function') panel.close();
-      else { panel.removeAttribute('open'); syncScrollLock(); }
+      else {
+        panel.removeAttribute('open');
+        if (cur && cur.parentNode !== document.body) document.body.appendChild(cur);
+        syncScrollLock();
+        schedule();
+      }
     };
     // the slide out is 0.36s (§05b); the panel must not sit invisible-but-open waiting for a
     // transitionend that a killed duration would never send, so the timer is the authority and
@@ -1966,8 +2194,12 @@ if (bingoWrap) {
     panel.addEventListener('close', () => {
       panel.classList.remove('is-open');
       if (gear) gear.setAttribute('aria-expanded', 'false');
+      // the mark goes home with the page it belongs to, so the next open moves it again rather
+      // than leaving a fixed node inside a closed display:none dialog
+      if (cur && cur.parentNode !== document.body) document.body.appendChild(cur);
       syncScrollLock();
       if (gear) gear.focus({ preventScroll: true });
+      schedule();   // the gear now holds focus: the bar must stay visible for it
     });
     // THE THIRD WAY OUT: a press on the backdrop. The dialog box is the panel itself (inset:0 0
     // 0 auto), so a click whose target is the dialog is a click on the field behind it — the

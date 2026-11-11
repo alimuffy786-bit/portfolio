@@ -165,7 +165,7 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    the hero's mark. `transform` (not `top`) is what Headroom drives in main.js — the bar leaves
    on a scroll down and returns on the first scroll up, and a transform can never reflow the
    page or fight the --sbw padding that keeps the bar off the scrollbar's edge. */
-nav{position:fixed;top:0;left:0;right:0;z-index:500;display:flex;justify-content:space-between;align-items:center;gap:1.5rem;padding:1.3rem var(--pad);padding-right:calc(var(--pad) + var(--sbw,0px));transition:transform 0.36s cubic-bezier(0.16,1,0.3,1);will-change:transform;}
+nav{position:fixed;top:0;left:0;right:0;z-index:510;display:flex;justify-content:space-between;align-items:center;gap:1.5rem;padding:1.3rem var(--pad);padding-right:calc(var(--pad) + var(--sbw,0px));transition:transform 0.36s cubic-bezier(0.16,1,0.3,1);will-change:transform;}
 nav.nav-hidden{transform:translateY(-101%);}
 nav::before{content:'';position:absolute;inset:0;z-index:-1;backdrop-filter:blur(10px);border-bottom:1px solid var(--rule-dark);background:rgba(20,16,12,0.82);}
 .nav-left{position:relative;display:flex;align-items:center;min-width:0;}
@@ -263,6 +263,26 @@ nav::before{content:'';position:absolute;inset:0;z-index:-1;backdrop-filter:blur
 .set-note{margin:0.6rem 0 1.5rem;max-width:30ch;font-family:var(--eb);font-size:0.76rem;line-height:1.5;color:var(--muted-dark);}
 .set-foot{margin-top:2rem;font-family:var(--mono);font-size:0.44rem;letter-spacing:0.16em;text-transform:uppercase;line-height:1.9;color:rgba(237,230,212,0.28);}
 
+/* -- 05c PAGE PROGRESS -------------------------------- */
+/* TWO PIXELS ON THE RIGHT EDGE, AND NOT A CONTROL. The track is the page's own scroll travel,
+   cut into five lengths — one per [data-nav] section, each as long as the scrolling it takes to
+   read that section — and the fill inside a length grows downward as the reading line crosses
+   it. main.js writes `flex-grow` from each window it measures and `transform: scaleY()` on the
+   fill, so a scroll never re-lays-out anything here; this block only says what the two states
+   look like.
+   pointer-events:none is the whole contract with the visitor: a 2px strip at the right edge sits
+   exactly where a scrollbar drag already is, and it must never be the thing a press lands on.
+   right:var(--sbw,0px) is the same guard the bar's padding-right uses — while an overlay holds
+   the scroll lock the scrollbar is gone and the viewport is ~15px wider, so a rail pinned at
+   right:0 would slide sideways at the moment the drawer opened, under the reader's eye.
+   THE 1PX GAPS ARE THE DIVIDERS. At this width a drawn rule would be a third of the rail, so the
+   segments are separated by air instead of ink; the five lengths still add up to the whole page.
+   The track is the brass held back to 22% and the fill is the brass, so a filled length reads as
+   the same material, lit — one hue at two intensities on every section, dark or light. */
+.page-progress{position:fixed;top:0;bottom:0;right:var(--sbw,0px);z-index:480;display:flex;flex-direction:column;gap:1px;width:2px;pointer-events:none;-webkit-user-select:none;user-select:none;}
+.pp-seg{position:relative;flex:0 1 0;min-height:0;overflow:hidden;background:rgba(158,116,40,0.22);}
+.pp-fill{position:absolute;inset:0;background:var(--brass);transform:scaleY(0);transform-origin:50% 0;will-change:transform;}
+
 /* MASKED LINE REVEAL — titles */
 .mask-wrap{overflow:hidden;}
 .mask-inner{display:block;transform:translateY(110%);transition:transform 0.55s cubic-bezier(0.16,1,0.3,1);}
@@ -283,7 +303,50 @@ nav::before{content:'';position:absolute;inset:0;z-index:-1;backdrop-filter:blur
 }
 
 /* -- 06 HERO ------------------------------------------- */
-#hero{position:relative;min-height:92dvh;display:grid;grid-template-columns:1fr;padding-left:var(--pad);overflow:hidden;background:var(--dark);color:var(--bone);}
+/* THE PRESS SHEET. The hero is the front sheet of a printed monograph: an ink field, four crop
+   marks on the frame's own gutter, a registration crosshair, a live caption line and one
+   portrait printed in three passes — monochrome base, halftone screen, accent ink — under a
+   procedural paper grain. None of that furniture is an image asset: the grain is one SVG filter
+   (sprite at the bottom of the page), the screen is a 5px radial-gradient mask, and each crop
+   mark is two 1px edges. `isolation` is not decoration: the portrait's multiply and color
+   passes must blend with the sheet, never through it to the bone page behind.
+   `--hero-pad` is the sheet's margin. It is --pad everywhere, 1.5rem where the phone block
+   already narrows the hero, and --gutter from 1200 up, where the grid below takes over. */
+#hero{position:relative;min-height:92dvh;display:grid;grid-template-columns:1fr;padding-left:var(--pad);overflow:hidden;background:var(--dark);color:var(--bone);isolation:isolate;--hero-pad:var(--pad);}
+/* THE PAPER — feTurbulence at three octaves over the ink field. A filter, not a tile: the noise
+   is generated at the element's own size, so a 2560px hero never shows a 280px repeat. */
+.hero-paper{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0.5;filter:url(#paperGrain);}
+/* THE CROP MARKS — four Ls, 13px each, on the gutter. They are the frame's corner brackets in a
+   printer's markup, not a border: nothing is drawn between them. aria-hidden, never hit. */
+.hero-crop{position:absolute;z-index:4;width:13px;height:13px;pointer-events:none;color:var(--muted-dark);opacity:0.6;}
+.hero-crop::before,.hero-crop::after{content:'';position:absolute;background:currentColor;}
+.hero-crop::before{width:100%;height:1px;}
+.hero-crop::after{width:1px;height:100%;}
+.crop-tl{left:var(--hero-pad);top:1.05rem;}
+.crop-tr{right:var(--hero-pad);top:1.05rem;}
+.crop-bl{left:var(--hero-pad);bottom:1.05rem;}
+.crop-br{right:var(--hero-pad);bottom:1.05rem;}
+.crop-tl::before,.crop-tr::before{top:0;}
+.crop-bl::before,.crop-br::before{bottom:0;}
+.crop-tl::before,.crop-bl::before{left:0;}
+.crop-tr::before,.crop-br::before{right:0;}
+.crop-tl::after,.crop-tr::after{top:0;}
+.crop-bl::after,.crop-br::after{bottom:0;}
+.crop-tl::after,.crop-bl::after{left:0;}
+.crop-tr::after,.crop-br::after{right:0;}
+/* THE REGISTRATION MARK — the crosshair a plate is aligned against, drawn inline so it is one
+   request lighter than a texture and can take the sheet's own ink colour. The paint lives on the
+   svg ITSELF (it is the element carrying this class), not on a descendant selector: the first
+   cut of this rule styled `.reg-crosshair svg`, matched nothing, and the browser's default black
+   fill duly painted a solid disc where a crosshair belongs. */
+.reg-crosshair{position:absolute;z-index:4;top:3.6rem;right:calc(var(--hero-pad) + 0.2rem);width:32px;height:32px;pointer-events:none;color:var(--muted-dark);opacity:0.75;fill:none;stroke:currentColor;stroke-width:0.8;}
+/* THE CAPTION LINE — coordinates, plate number and the sheet's own clock, set as a printer's
+   slug at the foot of the page. The clock ticks (main.js, 1s, paused while the tab is hidden
+   and while motion is off) and is aria-hidden: it is a detail of the object, not information. */
+.hero-ticker{position:absolute;left:var(--hero-pad);bottom:clamp(0.8rem,2.2vh,1.4rem);z-index:4;display:flex;align-items:center;gap:0.65rem;font-family:var(--mono);font-size:0.5rem;letter-spacing:0.17em;text-transform:uppercase;color:rgba(237,230,212,0.5);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.hero-ticker b{font-weight:400;color:rgba(237,230,212,0.82);}
+.hero-ticker-dot{flex:0 0 auto;width:4px;height:4px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px rgba(122,24,24,0.18);}
+.hero-ticker-sep{color:rgba(237,230,212,0.22);}
 /* THE HERO MARK — the asterisk the bar used to carry, set at display size and left to annotate
    the fold. It is the page's one decorative glyph: aria-hidden, unclickable, and it leaves the
    moment the visitor scrolls past 50px (main.js writes `html.is-scrolled`), so it can never
@@ -302,24 +365,71 @@ html.is-scrolled .hero-asterisk{opacity:0;visibility:hidden;transition:opacity 0
 .name-line{display:block;font-family:var(--serif);letter-spacing:-0.032em;line-height:0.865;white-space:nowrap;}
 .line-1{font-weight:700;color:var(--bone);}
 .line-2{font-weight:300;font-style:italic;color:var(--accent);text-shadow:0 2px 22px rgba(20,16,12,0.95);}
-.char{display:inline-block;opacity:0;transform:translateY(108%);animation:charUp 0.62s cubic-bezier(0.16,1,0.3,1) forwards;}
-@keyframes charUp{to{opacity:1;transform:none}}
+/* THE MASKED LINE — clip-path, not overflow. The reveal slides each line UP from below, so the
+   only edge that has to be hard is the bottom one; clipping the top of a 0.865 line box would
+   shave an ascender off a 140px display face. The negative insets keep the top and the sides
+   open, and the bottom edge is the line box, i.e. just under the baseline. main.js animates the
+   inner line's yPercent (GSAP) and writes transform:none when there is no GSAP or no motion. */
+.hero-line{display:block;clip-path:inset(-25% -12% 0 -12%);}
+.hero-line > .name-line{transform:translateY(110%);will-change:transform;}
 .hero-rule{display:block;width:3rem;height:1px;background:var(--accent);margin:2.2rem 0 1.8rem;opacity:0;animation:fi 0.5s 1.05s ease forwards;}
 .hero-tagline{font-family:var(--serif);font-style:italic;font-weight:300;font-size:clamp(0.88rem,1.35vw,1.1rem);color:rgba(237,230,212,0.6);line-height:1.55;max-width:36ch;opacity:0;animation:fi 0.5s 1.15s ease forwards;}
 @keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes fiPhoto{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
-.hero-photo-wrap{position:absolute;right:0;bottom:0;height:78%;z-index:1;opacity:0;animation:fiPhoto 1s 0.7s ease forwards;}
-.photo-layers{position:relative;height:100%;display:inline-block;}
-.photo-base{height:100%;width:auto;display:block;}
-.photo-tinted{position:absolute;top:0;left:0;height:100%;width:100%;filter:url(#tintHeavy);
-  -webkit-mask-image:radial-gradient(circle var(--r,60px) at var(--x,50%) var(--y,50%),transparent 0%,transparent 28%,rgba(0,0,0,0.5) 62%,black 100%);
-  mask-image:radial-gradient(circle var(--r,60px) at var(--x,50%) var(--y,50%),transparent 0%,transparent 28%,rgba(0,0,0,0.5) 62%,black 100%);}
+/* THE PORTRAIT — THREE PASSES OF ONE PLATE (699×532 RGBA, fetched once and inked three ways).
+   base     the photographic pass, monochrome
+   halftone the screen: a 5px radial-gradient mask cuts the plate into dots, multiplied down and
+            warmed toward the brass ink, so the mid-tones read as a printed tint
+   accent   the third ink: the plate recoloured to the accent and blended in `color`, so the
+            photograph keeps its own luminosity and borrows the sheet's one hue — the diagonal
+            mask is what makes it a plate wipe rather than a red photograph
+   The cutout keeps its own alpha, so no pass needs the silhouette as a mask, and no pass takes
+   a pointer. `object-position:right bottom` holds the figure on the sheet's corner at every
+   width; below 1200 the stack is absolutely placed, from 1200 it is a grid item. */
+.portrait-stack{position:absolute;right:0;bottom:0;height:78%;aspect-ratio:699/532;z-index:1;opacity:0;animation:fiPhoto 1s 0.7s ease forwards;}
+.pp-layer{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;object-position:right bottom;pointer-events:none;-webkit-user-select:none;user-select:none;}
+.pp-base{filter:grayscale(1) contrast(1.06) brightness(0.9);}
+.pp-halftone{mix-blend-mode:multiply;opacity:0.72;
+  filter:grayscale(1) sepia(0.9) hue-rotate(-10deg) saturate(2) contrast(2.4) brightness(1.18);
+  -webkit-mask-image:radial-gradient(circle,#000 1.05px,rgba(0,0,0,0) 1.6px);
+  mask-image:radial-gradient(circle,#000 1.05px,rgba(0,0,0,0) 1.6px);
+  -webkit-mask-size:5px 5px;mask-size:5px 5px;
+  -webkit-mask-repeat:repeat;mask-repeat:repeat;}
+.pp-accent{mix-blend-mode:color;opacity:0.6;
+  filter:grayscale(1) sepia(1) saturate(4.6) hue-rotate(-26deg) brightness(0.95) contrast(1.12);
+  -webkit-mask-image:linear-gradient(104deg,#000 0 34%,rgba(0,0,0,0.42) 60%,rgba(0,0,0,0) 86%);
+  mask-image:linear-gradient(104deg,#000 0 34%,rgba(0,0,0,0.42) 60%,rgba(0,0,0,0) 86%);
+  -webkit-mask-size:100% 100%;mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;}
 .sp{position:absolute;border-radius:50%;pointer-events:none;background:var(--bone);opacity:0;}
 .sp1{width:2.5px;height:2.5px;top:16%;left:12%;animation:spk 4.6s 0.5s ease-in-out infinite}
 .sp2{width:2px;height:2px;top:71%;left:22%;animation:spk 5.2s 1.6s ease-in-out infinite}
 .sp3{width:2px;height:2px;top:42%;left:8%;animation:spk 4.1s 2.3s ease-in-out infinite}
 .sp4{width:1.5px;height:1.5px;top:25%;left:35%;animation:spk 5.6s 0.9s ease-in-out infinite}
 @keyframes spk{0%,100%{opacity:0;transform:scale(0.5)}50%{opacity:0.45;transform:scale(1)}}
+
+/* -- 06b CONTENTS STRIP (the signboard) -----------------
+   THE HANDOFF. This is the hero's exit and the bar's entrance: a sticky contents row that runs
+   its five names sideways, and hands the top 44px to the fixed bar as it docks. main.js measures
+   ONE number — how far the strip has risen through its own height — and writes it twice: the
+   bar's opacity is p, the strip's type is 1 − p. At scrollY 0 the bar is not on the page at all;
+   when the strip reaches the top the type is gone and the bar is fully inked over it. Nothing in
+   this block animates that: both fades are per-frame values, so they cannot lag behind a scroll.
+   THE SEAM. Two identical lists, the second aria-hidden with tabindex=-1 on its links, give the
+   -50% loop a clean seam with no script and no gap to drift on — the track's width is exactly
+   twice a list's. Hover and focus pause it: a moving target is not a click target.
+   The bar sits at z 510, one above this strip, because the bar is what the strip becomes. */
+.marquee-toc{position:sticky;top:0;z-index:500;display:flex;align-items:stretch;height:2.6rem;overflow:hidden;color:var(--bone);background:rgba(20,16,12,0.9);border-top:var(--hairline) solid var(--rule-dark);border-bottom:var(--hairline) solid var(--rule-dark);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
+.marquee-track{display:flex;flex:0 0 auto;align-items:stretch;width:max-content;height:100%;animation:marquee 46s linear infinite;will-change:transform;}
+.marquee-set{display:flex;align-items:stretch;margin:0;padding:0;list-style:none;}
+.marquee-set li{display:flex;}
+.marquee-link{display:flex;align-items:center;gap:0.55rem;height:100%;padding:0 1.05rem;font-family:var(--mono);font-size:0.52rem;letter-spacing:0.19em;text-transform:uppercase;color:var(--muted-dark);text-decoration:none;white-space:nowrap;cursor:none;transition:color 0.2s ease;}
+.marquee-link:hover,.marquee-link:focus-visible{color:var(--bone);}
+.marquee-link:focus-visible{outline:1px solid var(--bone);outline-offset:-3px;}
+.marquee-n{color:var(--brass);font-size:0.92em;}
+.marquee-star{align-self:center;padding:0 0.62rem;font-size:0.62rem;color:var(--accent);}
+@keyframes marquee{from{transform:translate3d(0,0,0);}to{transform:translate3d(-50%,0,0);}}
+.marquee-toc:hover .marquee-track,.marquee-toc:focus-within .marquee-track{animation-play-state:paused;}
 
 /* -- 07 WHO -------------------------------------------- */
 #who{background:var(--bone);color:var(--dark);padding:7rem var(--pad) 6rem;border-bottom:1px solid var(--rule);position:relative;}
@@ -915,8 +1025,10 @@ html.is-scrolled .hero-asterisk{opacity:0;visibility:hidden;transition:opacity 0
 }
 @media(max-width:800px){
   .hero-left{max-width:100%;padding:0 0 2rem;}
-  #hero{padding-top:6rem;padding-left:1.5rem;}
-  .hero-photo-wrap{position:relative;right:auto;bottom:auto;height:42vh;align-self:flex-end;}
+  #hero{padding-top:6rem;padding-left:1.5rem;--hero-pad:1.5rem;}
+  /* the sheet's plate becomes a second row on the phone: sized by width, so it can never push
+     the page's scrollWidth past the gutter — the height follows the plate's own 699:532 ratio */
+  .portrait-stack{position:relative;right:auto;bottom:auto;height:auto;width:min(86vw,48vh);justify-self:end;align-self:end;}
   .who-body{grid-template-columns:1fr;gap:3rem;}
   .who-left{position:relative;top:auto;width:50%;}
   .case-01 .case-foot,.case-02 .camp-grid,.ops-grid{grid-template-columns:1fr;}
@@ -1014,10 +1126,11 @@ html.is-scrolled .hero-asterisk{opacity:0;visibility:hidden;transition:opacity 0
      desktop declaration that block replaced, so 768–800 reads like 801–1024: the same
      measure, the same row, the same hairline. Scoped to the same 800 the phone block and
      main.js's lfNarrowMQ use, so no width belongs to one and not the other. */
-  #hero{padding-left:var(--pad);}
+  #hero{padding-left:var(--pad);--hero-pad:var(--pad);}
   /* the photo stays in the flow — an absolute 78% plate needs a wide column to sit behind —
-     but it is a band on a tablet, not the phone's 42vh of screen */
-  .hero-photo-wrap{height:clamp(280px,36vh,420px);}
+     but it is a band on a tablet, not the phone's share of the screen. Height wins here, so the
+     plate's own ratio supplies the width again. */
+  .portrait-stack{height:clamp(280px,36vh,420px);width:auto;}
   /* the portrait beside the text again: the desktop's 33/67 split, sticky as it is above
      1100, with a gutter that narrows with the sheet instead of the desktop's fixed 6vw */
   .who-body{grid-template-columns:minmax(0,33fr) minmax(0,67fr);gap:5vw;}
@@ -1074,7 +1187,17 @@ html.is-scrolled .hero-asterisk{opacity:0;visibility:hidden;transition:opacity 0
   /* the frame, section by section — inline only, so every block-axis rhythm, every
      @media(max-height:940px) budget and every measured card keeps the height it had */
   nav{padding-left:var(--gutter);padding-right:calc(var(--gutter) + var(--sbw,0px));}
-  #hero{padding-left:var(--gutter);}
+  /* §06 — THE HERO IS THE SHEET. Same three tracks as every other band (--frame-cols), zero
+     padding, and the portrait spans into the outer track so it bleeds to the monitor's edge —
+     a grid track resolves against the client box, so this is scrollbar-exact with no 100vw. The
+     sheet is exactly one screen tall here, which is what makes the contents strip's dock land
+     predictably on the fold. Below 1200 none of this applies: the hero keeps its own padding and
+     the portrait keeps its absolute corner. */
+  #hero{grid-template-columns:var(--frame-cols);padding-left:0;--hero-pad:var(--gutter);height:100vh;min-height:0;align-items:center;}
+  /* both items name ROW 1 as well as their columns: auto-placement would put the portrait on a
+     row of its own (it overlaps .hero-left's track), and a second row would split the sheet. */
+  .hero-left{grid-column:2;grid-row:1;max-width:54%;}
+  .portrait-stack{position:relative;right:auto;bottom:auto;grid-column:2/4;grid-row:1;justify-self:end;align-self:end;height:80vh;width:min(42vw,620px);}
   #who{padding-inline:var(--gutter);}
   #reach{padding-inline:var(--gutter);}
   .footer{padding-inline:var(--gutter);}
@@ -1253,6 +1376,15 @@ html.is-scrolled .hero-asterisk{opacity:0;visibility:hidden;transition:opacity 0
 body, a, button, input, textarea, .dt-wrap, .bingo-wrap, .reach-link, .art-return { cursor: auto !important; }
   #cur { display: none !important; }
 }
+/* THE SLUG ON A NARROW PHONE — the coordinates are the first field to go: the clock and the plate
+   number still fit beside a 4px dot, and the ticker must never run past the sheet's right crop
+   mark (measured 410px against a 375px viewport with the old two-word field). It is still the
+   same sentence at 520, so nothing is lost to a reader: the paragraph above the fold says where
+   the work was made. */
+@media (max-width:520px){
+  .hero-ticker{font-size:0.44rem;letter-spacing:0.12em;gap:0.5rem;}
+  .hero-ticker-coord{display:none;}
+}
 
 /* -- 14 PREFERENCE SWITCHES (runtime, not media) -------------------------
    Two attributes on <html>, written by the settings drawer in main.js and read here. They are
@@ -1294,14 +1426,17 @@ html[data-motion="off"] .eid-reveal,
 html[data-motion="off"] .who-photo{animation:none !important;}
 html[data-motion="off"] .mask-inner{transition:none !important;transform:none;}
 html[data-motion="off"] .hero-asterisk{transition:none !important;}
+/* §06b — the signboard stops travelling, and a line that never got its tween is still a line:
+   the reveal's end state is `none`, so writing it here is the same frame the tween would end on. */
+html[data-motion="off"] .marquee-track{animation:none !important;}
+html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
 
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   .name-block{opacity:1}
-  .char{animation:none;opacity:1;transform:none}
   .mask-inner{transition:none;transform:none}
   .stat-snap{transition:none;transform:none;opacity:1}
-  .hero-rule,.hero-tagline,.hero-photo-wrap{animation:none;opacity:1}
+  .hero-rule,.hero-tagline,.portrait-stack{animation:none;opacity:1}
   .sp{animation:none}
   .clip-img,.eid-reveal,.who-photo{animation:none!important}
   .grain-heavy::after,.grain-light::after,.grain-deep::after{opacity:0}
@@ -1318,6 +1453,9 @@ html[data-motion="off"] .hero-asterisk{transition:none !important;}
   /* Workstream B: the bar still moves — that IS headroom, not decoration — but it cuts instead
      of sliding, and the drawer arrives in one frame. */
   nav,.set-drawer{transition:none!important}
+  /* §06/§06b: the plate reveal lands instantly, and the signboard is a still strip. */
+  .hero-line > .name-line{transform:none!important}
+  .marquee-track{animation:none!important}
 }
 </style>
 
@@ -1328,6 +1466,7 @@ html[data-motion="off"] .hero-asterisk{transition:none !important;}
   body,a,button,input,textarea,.dt-wrap,.bingo-wrap,.reach-link,.art-return{cursor:auto!important}
   #cur{display:none!important}
   .name-block{opacity:1!important}
+  .hero-line > .name-line{transform:none!important}
   .mask-inner{transform:none!important}
   .stat-snap{transform:none!important;opacity:1!important}
   /* the toggle would be a dead control without scripting — main.js is what binds it */
@@ -1337,6 +1476,13 @@ html[data-motion="off"] .hero-asterisk{transition:none !important;}
 <body>
 
 <div id="cur" aria-hidden="true"><span id="curWord"></span></div>
+
+<!-- ── THE PROGRESS TRACK (§05c, Workstream C) ──────────────────────────────────
+     Empty on purpose: main.js fills it with one segment per [data-nav] section, so the page
+     keeps exactly one list of its own sections and the rail can never name a place the bar does
+     not know about. aria-hidden — the breadcrumb in the bar is the same answer in words, and
+     that is the copy a screen reader should hear. -->
+<div class="page-progress" id="pageProgress" aria-hidden="true"></div>
 
 <nav aria-label="Primary" id="siteNav">
   <!-- LEFT: where you are. The breadcrumb is the section label, and it is the menu's handle. -->
@@ -1361,7 +1507,11 @@ html[data-motion="off"] .hero-asterisk{transition:none !important;}
   <!-- RIGHT: the settings drawer's only handle. A drawn gear, not a glyph: at 19px the
        character &#9881; renders differently in every fallback face. -->
   <button type="button" class="nav-gear" id="setOpen" aria-label="Settings" aria-haspopup="dialog" aria-controls="setPanel" aria-expanded="false">
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.4v2.8M12 18.8v2.8M2.4 12h2.8M18.8 12h2.8M5.2 5.2l2 2M16.8 16.8l2 2M18.8 5.2l-2 2M7.2 16.8l-2 2"/></svg>
+    <!-- a COG, not an asterisk: a hub, a rim, and eight teeth standing outside the rim. The old
+         glyph was a small circle with eight radiating ticks — at 19px it read as the site's own
+         mark, which is the one thing the settings handle must not be. Teeth run r 9.5 → 6.5 so
+         the rim stays a continuous circle at every size. -->
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.28 5.28l2.12 2.12M16.6 16.6l2.12 2.12M18.72 5.28L16.6 7.4M5.28 18.72L7.4 16.6"/></svg>
   </button>
 </nav>
 
@@ -1399,37 +1549,98 @@ html[data-motion="off"] .hero-asterisk{transition:none !important;}
   </div>
 </dialog>
 
-<svg width="0" height="0" style="position:absolute">
-  <filter id="tintHeavy" color-interpolation-filters="sRGB">
-    <feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 1 0"/>
-    <feComponentTransfer>
-      <feFuncR type="table" tableValues="0.20 0.68"/>
-      <feFuncG type="table" tableValues="0.04 0.52"/>
-      <feFuncB type="table" tableValues="0.04 0.48"/>
-      <feFuncA type="table" tableValues="0 1"/>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <!-- THE PAPER (§06). fractalNoise, not turbulence: the sheet wants a scatter of grain, not a
+       cloud. The filter region is the element's own box (objectBoundingBox units, hence the
+       0/0/100%/100%), so a 2560×900 hero is one 2560×900 field — no 280px tile edge anywhere on
+       it. The saturate matrix drops the noise to neutral, because the sheet's ink is the only
+       hue; the alpha ramp is what makes it a film over the field, not a grey rectangle. -->
+  <filter id="paperGrain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.86" numOctaves="3" seed="11" stitchTiles="stitch" result="grain"/>
+    <feColorMatrix in="grain" type="saturate" values="0" result="neutral"/>
+    <feComponentTransfer in="neutral">
+      <feFuncA type="linear" slope="0.62" intercept="0"/>
     </feComponentTransfer>
   </filter>
 </svg>
 
 <section id="hero" class="grain-heavy" data-nav="hero" data-nav-label="Aliasgar Dalal">
+  <!-- the press sheet's furniture: paper, four crop marks, the registration mark -->
+  <div class="hero-paper" aria-hidden="true"></div>
+  <span class="hero-crop crop-tl" aria-hidden="true"></span>
+  <span class="hero-crop crop-tr" aria-hidden="true"></span>
+  <span class="hero-crop crop-bl" aria-hidden="true"></span>
+  <span class="hero-crop crop-br" aria-hidden="true"></span>
+  <svg class="reg-crosshair" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
+    <circle cx="20" cy="20" r="11.2"/>
+    <path d="M20 1.5v9M20 29.5v9M1.5 20h9M29.5 20h9"/>
+    <path d="M20 15.4v9.2M15.4 20h9.2"/>
+  </svg>
   <div class="sp sp1"></div><div class="sp sp2"></div><div class="sp sp3"></div><div class="sp sp4"></div>
   <!-- the mark: decorative, aria-hidden, and it leaves on the first 50px of scroll (§06) -->
   <span class="hero-asterisk" id="heroAsterisk" aria-hidden="true">*</span>
   <div class="hero-left">
     <h1 class="name-block" id="nameBlock">
-      <span class="name-line line-1" id="line1">ALIASGAR</span>
-      <span class="name-line line-2" id="line2">DALAL</span>
+      <span class="hero-line"><span class="name-line line-1" id="line1">ALIASGAR</span></span>
+      <span class="hero-line"><span class="name-line line-2" id="line2">DALAL</span></span>
     </h1>
     <span class="hero-rule"></span>
     <p class="hero-tagline">The work is almost never finished.<br>This is what&rsquo;s done.</p>
   </div>
-  <div class="hero-photo-wrap" id="photoWrap">
-    <div class="photo-layers">
-      <img class="photo-base" src="images/hero-photo.png" alt="Aliasgar Dalal">
-      <img class="photo-tinted" id="photoTinted" src="images/hero-photo.png" alt="">
-    </div>
+  <!-- ONE PLATE, THREE PASSES (§06). The same file three times, so the browser fetches 314 KB
+       once; the base is the photograph, the halftone is its screen, the accent is the third ink.
+       width/height are the file's own 699×532, so the sheet reserves the plate before the bytes
+       land. The two overlay passes are aria-hidden and never take a pointer. -->
+  <div class="portrait-stack" id="photoWrap">
+    <img class="pp-layer pp-base" id="ppBase" src="images/hero-photo-new.png" width="699" height="532" alt="Aliasgar Dalal" fetchpriority="high" decoding="async">
+    <img class="pp-layer pp-halftone" src="images/hero-photo-new.png" width="699" height="532" alt="" aria-hidden="true" decoding="async">
+    <img class="pp-layer pp-accent" src="images/hero-photo-new.png" width="699" height="532" alt="" aria-hidden="true" decoding="async">
+  </div>
+  <!-- the slug: real coordinates, the plate's number, and the sheet's own clock (aria-hidden —
+       a running second is a detail of the object, not information a reader needs) -->
+  <div class="hero-ticker">
+    <span class="hero-ticker-dot" aria-hidden="true"></span>
+    <span class="hero-ticker-coord">25.3575&deg;N&nbsp;&nbsp;55.4198&deg;E</span>
+    <span class="hero-ticker-sep" aria-hidden="true">/</span>
+    <b>Plate 00 &mdash; Hero</b>
+    <span class="hero-ticker-sep" aria-hidden="true">/</span>
+    <span aria-hidden="true"><time id="heroClock">--:--:--</time>&nbsp;GST</span>
   </div>
 </section>
+
+<!-- ── THE CONTENTS STRIP (§06b) ────────────────────────────────────────────────
+     The hero's exit and the bar's entrance: sticky at the top of the page, five names running
+     sideways, handed over to the fixed bar as it docks (main.js writes both fades from one
+     measurement). The second list is the seam for the -50% loop; it is aria-hidden and its links
+     are tabindex=-1, so a screen reader and the Tab ring hear the contents exactly once. -->
+<div class="marquee-toc" id="marqueeToc">
+  <div class="marquee-track" id="marqueeTrack">
+    <ul class="marquee-set">
+      <li><a class="marquee-link" href="#who"><span class="marquee-n">01</span><span>Who</span></a></li>
+      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#work"><span class="marquee-n">02</span><span>Work</span></a></li>
+      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#magazine"><span class="marquee-n">&lowast;</span><span>Akcidental Vision</span></a></li>
+      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#reach"><span class="marquee-n">03</span><span>Get in touch</span></a></li>
+      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#footerB1" data-cursor="archive"><span class="marquee-n">B1</span><span>Personal archive</span></a></li>
+      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
+    </ul>
+    <ul class="marquee-set" aria-hidden="true">
+      <li><a class="marquee-link" href="#who" tabindex="-1"><span class="marquee-n">01</span><span>Who</span></a></li>
+      <li><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#work" tabindex="-1"><span class="marquee-n">02</span><span>Work</span></a></li>
+      <li><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#magazine" tabindex="-1"><span class="marquee-n">&lowast;</span><span>Akcidental Vision</span></a></li>
+      <li><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#reach" tabindex="-1"><span class="marquee-n">03</span><span>Get in touch</span></a></li>
+      <li><span class="marquee-star">&lowast;</span></li>
+      <li><a class="marquee-link" href="#footerB1" tabindex="-1"><span class="marquee-n">B1</span><span>Personal archive</span></a></li>
+      <li><span class="marquee-star">&lowast;</span></li>
+    </ul>
+  </div>
+</div>
 
 <svg width="0" height="0" style="position:absolute">
   <filter id="tintFilterWho" color-interpolation-filters="sRGB">
