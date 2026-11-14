@@ -31,6 +31,15 @@ const stillMotion = () => calmMotion() || rootEl.getAttribute('data-motion') ===
 // declared up here because syncScrollLock() below runs at parse time (pageshow/visibilitychange)
 // and must be able to reach it; the controller that assigns it lives further down
 let smoothLenis = null;
+// §06 — the smoother's last velocity and when it was read, so the sheet's frame can prefer Lenis's
+// own number (it knows the gesture) and fall back to a scroll delta when there is no instance.
+// Declared here, above syncSmoothScroll(), because the callback attached there writes them.
+let fxLenVel = 0, fxLenAt = 0;
+// ...and the sheet's own frame state lives here for the same reason: syncSmoothScroll() can ask for
+// a frame from a scroll callback long before the hero module below has been parsed, so nothing in
+// that path may sit in the temporal dead zone of a `let` declared further down the file.
+let fxItems = [], fxSkewItems = [], fxGearSet = null, fxRaf = 0;
+let fxLastY = 0, fxVel = 0;
 function syncScrollLock(){
   const lf = document.getElementById('lfModal'), art = document.getElementById('artOverlay');
   // the settings drawer is a modal <dialog>: it traps focus by itself, but nothing about
@@ -102,6 +111,18 @@ function syncSmoothScroll(){
   }
   smoothLenis = new window.Lenis({
     autoRaf: true,   // Lenis owns its loop; calling raf() by hand as well would double-step it
+  });
+  // §06 — THE SHEET READS THE SMOOTHER'S VELOCITY. One callback, attached where the instance is
+  // built, so a rebuild (a breakpoint cross, or the drawer's Motion switch going back on) attaches
+  // exactly once and a destroy takes it with the instance. `velocity` is px per frame in Lenis
+  // 1.3.x; it is divided down in drawFx() and damped there, so this only has to remember it.
+  smoothLenis.on('scroll', e => {
+    const v = (e && typeof e.velocity === 'number') ? e.velocity : 0;
+    if (Math.abs(v) > 0.01){
+      fxLenVel = v;
+      fxLenAt = (window.performance && performance.now) ? performance.now() : Date.now();
+    }
+    scheduleFx();
   });
   // a lock that survived a bfcache restore must not be undone by the instance we just built
   if (document.body.dataset.scrollLock === '1') smoothLenis.stop();
@@ -298,17 +319,39 @@ document.querySelectorAll('[data-magnetic]').forEach(el => {
 });
 
 // ═══════════════════════════════════════════════════
-// HERO — name fit + char animation + cursor-as-light
+// HERO — THE GOTHIC RISO BROADSHEET (§06)
 // ═══════════════════════════════════════════════════
+// Six things live here — the masthead's fit, its masked reveal, the two vinyl stickers (placement,
+// drag, gloss), the riso plate's drift and shuffle, and the one rAF that carries the sheet's
+// scroll motion (velocity skew, parallax, the gear) — and they all obey one rule: EVERY transform
+// on a hero element is written through GSAP (set / quickSetter / Draggable), never as a raw
+// style.transform. GSAP keeps a per-element transform cache, so parallax (y), velocity
+// (skewY/scaleY), the drag (x/y/rotation) and the jitter (x/y/rotation) compose into one matrix
+// instead of overwriting each other. Where two of them would collide on one node, the markup gives
+// them two nodes: `.sticker-slot` carries the parallax, the `.sticker` inside it carries the hand.
+function clampNum(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+
+// THE MASTHEAD'S FIT — one size for both words. The blackletter has no italic and no light cut, so
+// the two rows are the same face at the same size: fitting them independently (the old 0.62 factor
+// on line 2) was compensating for a second, lighter typeface that no longer exists. The loop
+// shrinks the pair until the WIDER of the two fits, which is what keeps the block one rectangle
+// instead of a long word over a short one at an unrelated size.
 function fitName(){
   const block = document.getElementById('nameBlock');
   const l1 = document.getElementById('line1');
   const l2 = document.getElementById('line2');
   if (!block || !l1 || !l2) return;
   const w = block.clientWidth;
-  let s1 = 260; l1.style.fontSize = s1+'px'; l1.style.whiteSpace = 'nowrap';
-  while (l1.scrollWidth > w && s1 > 20) { s1 -= 2; l1.style.fontSize = s1+'px'; }
-  l2.style.fontSize = Math.round(s1*0.62)+'px'; l2.style.whiteSpace = 'nowrap';
+  if (!w) return;                      // display:none / pre-layout: measure again when it isn't
+  let s = 300;
+  // `scrollWidth`, not a rect: the group that contains each word is shrink-to-fit and is capped at
+  // the block's width, so a rect would report "it fits" for a word that is overflowing it.
+  const widest = () => Math.max(l1.scrollWidth, l2.scrollWidth);
+  for (const l of [l1, l2]){ l.style.fontSize = s + 'px'; l.style.whiteSpace = 'nowrap'; }
+  while (widest() > w && s > 18){
+    s -= 2;
+    for (const l of [l1, l2]) l.style.fontSize = s + 'px';
+  }
 }
 function debounce(func, wait) {
   let timeout;
@@ -346,107 +389,261 @@ function revealName(){
     for (const line of lines) line.style.transform = 'none';
   }
 }
-// Init on DOMContentLoaded, not window 'load': 'load' waits on every image, and 14 of the 19 images
-// on this page are eager (~2 MB total) — that held the name at opacity 0 for seconds on mobile.
-// Sizing runs twice: instantly on the metrics that are live, then re-fitted once the real Cormorant
-// Garamond faces are in. The font paths re-fit only — they never reveal again — because the line
-// reveal starts the moment this runs (1.4s, 0.15s stagger), so a reveal deferred to the fonts
-// would silently eat the whole intro.
+// ── THE STICKERS ────────────────────────────────────────────────────────────────────────────
+// The plates are PLACED by CSS (percentages of the word, §06); JS only adds the hand:
+//   alignStickers()  the resting jitter — a few degrees and a few pixels, re-rolled on every load
+//                    so the two plates never look like they were set on a grid — and the CLAMP: a
+//                    64%-of-the-word square hung past the word's right edge would run off the
+//                    sheet on a phone, so the offset is walked back inside #hero's own rect.
+//   Draggable        x/y inside #hero with edge resistance and an elastic release; the scale on
+//                    press is what makes the vinyl read as lifted rather than as a moving picture.
+//   the gloss        a screen-blended bubble that follows the pointer across the plate. It writes
+//                    CSS VARIABLES (--bubble-x / --bubble-y), not a transform: the sticker's
+//                    transform belongs to GSAP, and a second writer there would fight the drag.
+const heroEl = document.getElementById('hero');
+const stickerBtns = heroEl ? Array.from(heroEl.querySelectorAll('.sticker')) : [];
+const stickerDrags = [];
+
+function alignStickers(){
+  if (!heroEl || !stickerBtns.length) return;
+  const hr = heroEl.getBoundingClientRect();
+  const narrow = !!(window.matchMedia && window.matchMedia('(max-width: 800px)').matches);
+  const amp = narrow ? { x: 9, y: 7, r: 2.4 } : { x: 16, y: 12, r: 4 };
+  for (const btn of stickerBtns){
+    if (!btn.offsetWidth) continue;
+    // measure from the CSS anchor, not from wherever the last drag left it: the jitter is an
+    // absolute rest offset, so it must not accumulate every time this runs (fonts, resize).
+    if (window.gsap) window.gsap.set(btn, { x: 0, y: 0, rotation: 0 });
+    else btn.style.transform = 'none';
+    const r = btn.getBoundingClientRect();
+    if (!r.width) continue;
+    let x = (Math.random() * 2 - 1) * amp.x;
+    let y = (Math.random() * 2 - 1) * amp.y;
+    const rot = -5 + (Math.random() * 2 - 1) * amp.r;
+    if (r.right + x > hr.right - 6) x -= (r.right + x) - (hr.right - 6);
+    if (r.left + x < hr.left + 6) x += (hr.left + 6) - (r.left + x);
+    if (r.bottom + y > hr.bottom - 6) y -= (r.bottom + y) - (hr.bottom - 6);
+    if (r.top + y < hr.top + 6) y += (hr.top + 6) - (r.top + y);
+    if (window.gsap) window.gsap.set(btn, { x: x, y: y, rotation: rot });
+    else btn.style.transform = 'translate(' + x + 'px,' + y + 'px) rotate(' + rot + 'deg)';
+  }
+  // the drag's bounds were measured around the old offsets; let each instance re-read itself
+  for (const d of stickerDrags){ try { if (d && d.update) d.update(); } catch (e) { /* older plugin */ } }
+}
+
+function initStickers(){
+  if (!heroEl) return;
+  for (const btn of stickerBtns){
+    const gloss = btn.querySelector('.sticker__gloss');
+    if (gloss){
+      const setBubble = (x, y) => {
+        gloss.style.setProperty('--bubble-x', x.toFixed(1) + 'px');
+        gloss.style.setProperty('--bubble-y', y.toFixed(1) + 'px');
+      };
+      btn.addEventListener('pointermove', e => {
+        if (stillMotion() || (e.pointerType && e.pointerType !== 'mouse')) return;
+        const r = btn.getBoundingClientRect();
+        setBubble((e.clientX - (r.left + r.width / 2)) * 0.35,
+                  (e.clientY - (r.top + r.height / 2)) * 0.35);
+      }, { passive: true });
+      btn.addEventListener('pointerleave', () => setBubble(0, 0), { passive: true });
+    }
+    if (!window.Draggable || !window.gsap) continue;
+    // No Draggable (a missing vendored file), or no GSAP: the stickers stay where they are. That is
+    // the whole fallback — a still print is not a broken one.
+    const d = window.Draggable.create(btn, {
+      type: 'x,y', bounds: heroEl, edgeResistance: 0.85, dragResistance: 0.06,
+      onPress(){ window.gsap.to(btn, { scale: 1.06, duration: 0.22, ease: 'power2.out', overwrite: 'auto' }); },
+      onDragStart(){ btn.classList.add('dragging'); },
+      onRelease(){
+        btn.classList.remove('dragging');
+        const still = stillMotion();
+        window.gsap.to(btn, { scale: 1, duration: still ? 0 : 0.9,
+          ease: still ? 'none' : 'elastic.out(1,0.42)', overwrite: 'auto' });
+      },
+    });
+    if (d && d[0]) stickerDrags.push(d[0]);
+  }
+}
+
+// ── THE PLATE: THREE INKS ON ONE SHEET ──────────────────────────────────────────────────────
+// The three passes are ONE file and one fetch; what changes between them is the ink (the CSS
+// filters) and their REGISTRATION. The pointer pulls the colour drums apart by a few pixels — the
+// key never moves, because it is the plate everything else registers against — and a click (or
+// Enter/Space: the plate is a button) SHUFFLES the stack: the top drum slides off to the right and
+// returns from the left UNDERNEATH, which is what a printer does when they re-run a colour.
+const risoEl = document.getElementById('risoPortrait');
+let risoLayers = risoEl ? Array.from(risoEl.querySelectorAll('.rp-layer')) : [];
+const RISO_DEPTH = [9, -7, 0];        // red one way, blue the other, the key holds
+let risoShuffling = false;
+
+function shuffleRiso(){
+  if (!risoEl || risoShuffling || risoLayers.length < 2) return;
+  const top = risoLayers[risoLayers.length - 1];
+  // paint order IS DOM order, so the plate that was on top goes to the FRONT of the stack. The
+  // array is kept in the same order as the DOM, so each drum keeps its own drift depth.
+  const rotate = () => {
+    risoEl.insertBefore(top, risoEl.firstElementChild);
+    risoLayers = [top].concat(risoLayers.slice(0, -1));
+  };
+  risoShuffling = true;
+  if (!window.gsap || stillMotion()){ rotate(); risoShuffling = false; return; }
+  const px = Math.max(120, (risoEl.offsetWidth || 400) * 0.6);
+  window.gsap.timeline({ onComplete(){ risoShuffling = false; } })
+    .to(top, { x: px, y: -10, opacity: 0, duration: 0.36, ease: 'power2.in' })
+    .add(rotate)
+    .fromTo(top, { x: -px, y: 10 }, { x: 0, y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' });
+}
+
+function initRiso(){
+  if (!risoEl || !risoLayers.length) return;
+  risoEl.addEventListener('click', shuffleRiso);
+  risoEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'){ e.preventDefault(); shuffleRiso(); }
+  });
+  if (!window.gsap || !hasFinePointer()) return;
+  // The drift: one rAF that STOPS when it has caught up (no permanent frame loop on a still
+  // sheet), and it never reads a rect inside the loop.
+  let raf = 0, dx = 0, dy = 0, wx = 0, wy = 0;
+  const draw = () => {
+    dx += (wx - dx) * 0.12;
+    dy += (wy - dy) * 0.12;
+    const done = Math.abs(wx - dx) < 0.01 && Math.abs(wy - dy) < 0.01;
+    if (!risoShuffling && !stillMotion()){
+      for (let i = 0; i < risoLayers.length; i++){
+        const d = RISO_DEPTH[i] || 0;
+        if (d) window.gsap.set(risoLayers[i], { x: dx * d, y: dy * d });
+      }
+    }
+    raf = done ? 0 : requestAnimationFrame(draw);
+  };
+  const wake = () => { if (!raf) raf = requestAnimationFrame(draw); };
+  risoEl.addEventListener('pointermove', e => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    const r = risoEl.getBoundingClientRect();
+    wx = clampNum((e.clientX - (r.left + r.width / 2)) / Math.max(200, r.width / 2), -1, 1);
+    wy = clampNum((e.clientY - (r.top + r.height / 2)) / Math.max(200, r.height / 2), -1, 1);
+    wake();
+  }, { passive: true });
+  risoEl.addEventListener('pointerleave', () => { wx = 0; wy = 0; wake(); }, { passive: true });
+  // Motion off: every drum goes back to register, once, off the same attribute the stylesheet reads.
+  new MutationObserver(() => {
+    if (!stillMotion()) return;
+    wx = 0; wy = 0; dx = 0; dy = 0;
+    for (const l of risoLayers) window.gsap.set(l, { x: 0, y: 0 });
+  }).observe(rootEl, { attributes: true, attributeFilter: ['data-motion'] });
+}
+
+// ── ONE FRAME FOR THE SHEET ────────────────────────────────────────────────────────────────
+// Everything that reads the scroll is computed here, once per frame, from ONE position:
+//   parallax   each [data-parallax-speed] node is translated by -(y × (speed − 1)), so 1 is the
+//              page itself, 0.8 lags behind it (the stock) and 1.5 runs ahead (the stickers).
+//   velocity   damped toward the scroll's own speed and written as skewY (+ a hair of scaleY) on
+//              [data-skew] — the masthead, the plate and the stickers lean into a fast scroll and
+//              settle back. Clamped to ±1 so no flick can fold the type over.
+//   the gear   rotates 720° across the sheet's own height, plus a little lean from the velocity.
+// The velocity is LENIS'S when the smoother is alive (one callback, attached where the instance is
+// built, so a rebuild re-attaches exactly once) and the frame-to-frame delta when it is not — which
+// is what keeps the sheet's motion working below 768px, where Lenis deliberately does not exist.
+// (frame state is declared next to fxLenVel, at the top of the file — see the note there.)
+
+function collectFx(){
+  if (!heroEl || !window.gsap) return;
+  const q = sel => Array.from(heroEl.querySelectorAll(sel));
+  fxItems = q('[data-parallax-speed]').map(el => ({
+    el: el, speed: parseFloat(el.getAttribute('data-parallax-speed')) || 1,
+    setY: window.gsap.quickSetter(el, 'y', 'px'),
+  }));
+  // THE STICKERS TAKE THE SAME SKEW, but they are NOT in the stylesheet's off-switch list, and the
+  // reason is in §06: their transform also carries the drag, the jitter and the resting rotation, so
+  // `transform:none !important` would not "stop" them — it would teleport them back to their CSS
+  // anchors and break the hand. drawFx zeroes their skew instead, on the same stillMotion() the
+  // stylesheet reads, so the result is identical and the placement survives.
+  fxSkewItems = q('[data-skew], .sticker').map(el => ({
+    el: el, setSkew: window.gsap.quickSetter(el, 'skewY', 'deg'),
+    setScale: window.gsap.quickSetter(el, 'scaleY'),
+  }));
+  const gear = heroEl.querySelector('.hero-gear-asterisk');
+  fxGearSet = gear ? window.gsap.quickSetter(gear, 'rotation', 'deg') : null;
+  fxLastY = Math.max(0, window.scrollY);   // start from where the page actually is, not from 0
+}
+
+function drawFx(){
+  fxRaf = 0;
+  if (!window.gsap || !heroEl) return;
+  const y = Math.max(0, window.scrollY);
+  if (stillMotion()){
+    fxVel = 0;
+    for (const it of fxItems) it.setY(0);
+    for (const s of fxSkewItems){ s.setSkew(0); s.setScale(1); }
+    if (fxGearSet) fxGearSet(0);
+    fxLastY = y;
+    return;
+  }
+  const delta = y - fxLastY;
+  fxLastY = y;
+  const now = (window.performance && performance.now) ? performance.now() : Date.now();
+  const fresh = (now - fxLenAt) < 140;
+  const raw = (fresh && Math.abs(fxLenVel) > 0.01) ? fxLenVel / 45 : delta / 16;
+  fxVel += (clampNum(raw, -1, 1) - fxVel) * 0.18;
+  const heroH = heroEl.offsetHeight || 1;
+  const capped = Math.min(y, heroH);
+  for (const it of fxItems) it.setY(-(capped * (it.speed - 1)));
+  for (const s of fxSkewItems){ s.setSkew(fxVel * 2.2); s.setScale(1 - Math.min(0.03, Math.abs(fxVel) * 0.03)); }
+  if (fxGearSet) fxGearSet((capped / heroH) * 720 + fxVel * 8);
+  // KEEP THE LOOP ALIVE UNTIL THE VELOCITY HAS ACTUALLY DECAYED. Without this line the last flick's
+  // skew would be the state the sheet keeps until the next scroll event, so a page that stops dead
+  // would be left permanently leaning — and the gear would keep the flick's angle forever.
+  if (Math.abs(fxVel) > 0.0015) fxRaf = requestAnimationFrame(drawFx);
+}
+
+function scheduleFx(){ if (!fxRaf) fxRaf = requestAnimationFrame(drawFx); }
+if (heroEl) window.addEventListener('scroll', scheduleFx, { passive: true });
+
+// Init on DOMContentLoaded, not window 'load': 'load' waits on every image, and the two sticker
+// plates alone are 2.3 MB — that held the name at opacity 0 for seconds on mobile. Sizing runs
+// twice: instantly on the metrics that are live, then again once the blackletter has landed (the
+// fit is a 2px walk, so a different face is a different answer) — and the stickers are placed after
+// the words have a size, because their percentages are percentages OF those words.
 let heroInited = false;
 function initHero(){
   const nb = document.getElementById('nameBlock');
   if (heroInited || !nb) return;   // revealName() must run once: twice would restart the stagger
   heroInited = true;
   fitName();                       // size with whatever metrics are available right now
+  alignStickers();                 // place the plates after the words have a size
   revealName();
+  initStickers();
+  initRiso();
+  collectFx();
+  scheduleFx();
 }
-const refitHero = () => { if (heroInited) fitName(); };
+const refitHero = () => { if (heroInited){ fitName(); alignStickers(); collectFx(); scheduleFx(); } };
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initHero, { once: true });
 else initHero();                   // defer/async or late injection: the DOM is already parsed
 if (document.fonts) {
-  if (document.fonts.load) {       // force the two hero faces, then wait on exactly those
+  if (document.fonts.load) {       // force the masthead face, then wait on exactly that
     Promise.all([
-      document.fonts.load('700 1em "Cormorant Garamond"'),
-      document.fonts.load('italic 300 1em "Cormorant Garamond"')
+      document.fonts.load('700 1em "JSL Blackletter"'),
+      document.fonts.load('400 1em "JSL Blackletter"')
     ]).then(refitHero, refitHero);
   } else if (document.fonts.ready) {
     document.fonts.ready.then(refitHero);
   }
   if (document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', refitHero);
 }
-window.addEventListener('resize', debounce(fitName, 100));
+window.addEventListener('resize', debounce(() => { if (heroInited){ fitName(); alignStickers(); } }, 120));
 
-// THE PLATE'S PARALLAX — three passes at three depths, so the portrait is a stack of printed
-// layers rather than a photograph with an effect on it. The pointer's offset from the plate's
-// centre is normalised to -1..1 and each pass translates by depth × that number: 5 / 11 / 18px
-// at full deflection. It is one rAF loop that STOPS when it has caught up (no permanent frame
-// loop on a static hero), it never reads a rect inside the loop, and it composes with the reveal
-// because that tween owns the line, not the plate.
-// Motion off (or a coarse pointer, where there is no hover to read) parks all three passes at 0.
-const portraitStack = document.getElementById('photoWrap');
-const plateLayers = portraitStack ? Array.from(portraitStack.querySelectorAll('.pp-layer')) : [];
-const PLATE_DEPTH = [5, 11, 18];
-if (portraitStack && plateLayers.length){
-  let plateRaf = 0, plateX = 0, plateY = 0, wantX = 0, wantY = 0;
-  const drawPlate = () => {
-    plateX += (wantX - plateX) * 0.1;
-    plateY += (wantY - plateY) * 0.1;
-    const done = Math.abs(wantX - plateX) < 0.002 && Math.abs(wantY - plateY) < 0.002;
-    for (let i = 0; i < plateLayers.length; i++){
-      const d = PLATE_DEPTH[i] || 0;
-      plateLayers[i].style.transform =
-        'translate3d(' + (plateX * d).toFixed(2) + 'px,' + (plateY * d).toFixed(2) + 'px,0)';
-    }
-    plateRaf = done ? 0 : requestAnimationFrame(drawPlate);
-  };
-  const wakePlate = () => { if (!plateRaf) plateRaf = requestAnimationFrame(drawPlate); };
-  document.addEventListener('pointermove', e => {
-    if ((e.pointerType && e.pointerType !== 'mouse') || !hasFinePointer() || stillMotion()){
-      wantX = 0; wantY = 0; wakePlate(); return;
-    }
-    const r = portraitStack.getBoundingClientRect();
-    const nx = (e.clientX - (r.left + r.width / 2)) / Math.max(240, r.width / 2);
-    const ny = (e.clientY - (r.top + r.height / 2)) / Math.max(240, r.height / 2);
-    wantX = nx < -1 ? -1 : (nx > 1 ? 1 : nx);
-    wantY = ny < -1 ? -1 : (ny > 1 ? 1 : ny);
-    wakePlate();
-  }, { passive: true });
-  // the switch writes data-motion: when it goes off, the plate returns to rest in one pass
-  new MutationObserver(() => { if (stillMotion()){ wantX = 0; wantY = 0; wakePlate(); } })
-    .observe(rootEl, { attributes: true, attributeFilter: ['data-motion'] });
-}
+// REMOVED — THE PLATE'S POINTER PARALLAX. It translated each pass by a depth (5/11/18px) on the
+// RAW style.transform, which is exactly the bug the new sheet cannot afford: GSAP's cache does not
+// know about a matrix written behind its back, so the next quickSetter (velocity skew) or the next
+// riso drift would snap the plate to a transform that had never heard of the pointer. The depth
+// idea survives as the riso drift's RISO_DEPTH (see initRiso), and it is written through GSAP.
 
-// THE SHEET'S CLOCK — the slug's last field, ticking once a second in Gulf time (the coordinates
-// printed beside it are Sharjah's). It is a detail of the printed object, so it is aria-hidden in
-// the markup and it stops for the two audiences that asked for stillness: a hidden tab and a
-// visitor who turned Motion off (§14). Nothing here writes layout — one text node per second.
-const sheetClock = document.getElementById('heroClock');
-if (sheetClock){
-  let clockTimer = 0;
-  let clockFmt = null;
-  try {
-    clockFmt = new Intl.DateTimeFormat('en-GB', {
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Dubai',
-    });
-  } catch (e) { clockFmt = null; }              // a browser without IANA zones: local time
-  const readClock = () => {
-    try { return clockFmt ? clockFmt.format(new Date()) : new Date().toTimeString().slice(0, 8); }
-    catch (e) { return new Date().toTimeString().slice(0, 8); }
-  };
-  const tickClock = () => { sheetClock.textContent = readClock(); };
-  const startClock = () => {
-    if (clockTimer || stillMotion()) return;
-    tickClock();
-    clockTimer = setInterval(tickClock, 1000);
-  };
-  const stopClock = () => { clearInterval(clockTimer); clockTimer = 0; };
-  startClock();
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopClock(); else startClock();
-  });
-  new MutationObserver(() => { if (stillMotion()) stopClock(); else startClock(); })
-    .observe(rootEl, { attributes: true, attributeFilter: ['data-motion'] });
-}
+// REMOVED — THE SHEET'S CLOCK. #heroClock went with the slug (there is no caption line on a
+// broadsheet), so the interval, the Intl formatter, the visibility gate and the MutationObserver
+// that stopped and restarted it all went too. One fewer timer, and one fewer module to hold the
+// twelfth-second it was measuring.
 
 // ═══════════════════════════════════════════════════
 // MASKED LINE REVEAL + STAT SNAP — IntersectionObserver, sitewide
@@ -1882,14 +2079,18 @@ if (bingoWrap) {
   // bar is on the page) both come from the same scroll position, so they are computed together —
   // and every geometry READ happens before any class is WRITTEN, so the frame cannot read back
   // its own writes as a forced re-layout.
-  const ASTERISK_AT = 50;    // the hero mark leaves over the first 50px (§06)
+  // §06 RETIRED ASTERISK_AT (50). It was the scroll position at which the hero's display asterisk
+  // faded, and it wrote `html.is-scrolled` for a single stylesheet rule. The broadsheet has no
+  // asterisk (the gear is a different mark and it turns instead of leaving), so both the constant
+  // and the class went with it rather than leaving a selector nothing can match and a class nothing
+  // reads. What remains is the bar's own choreography, which never needed the hero.
   const HIDE_AT     = 140;   // the bar only starts leaving once the hero is behind it
   const DELTA       = 5;     // px of travel before a direction counts: a jittery wheel is not a scroll
   const LINE        = 0.4;   // the reading line: 40% down the viewport, never the top edge
 
   let anchorY = Math.max(0, window.scrollY);  // the position the current direction was measured from
   let hide = false;                           // ...and the direction the bar is following
-  let shownHidden = false, shownScrolled = false, shownId = '';
+  let shownHidden = false, shownId = '';
   let menuOpen = false;
   // THE HANDOFF'S TWO ANSWERS (§06b), and the last opacity each surface was given. -1 is "never
   // written", so the first frame always paints both sides exactly once.
@@ -1992,10 +2193,8 @@ if (bingoWrap) {
       if (p >= 1) completed++;
     }
 
-    // WRITE: the asterisk (§06) — one class on <html>, because the mark is not the only thing
-    // that changes once the page has moved and the stylesheet already has the selector.
-    const scrolled = y > ASTERISK_AT;
-    if (scrolled !== shownScrolled){ shownScrolled = scrolled; rootEl.classList.toggle('is-scrolled', scrolled); }
+    // WRITE: nothing here is about the hero any more. The asterisk's class write is gone (§06), and
+    // the reads above are the only geometry this frame needs.
 
     // WRITE: the label and the lit row — and only when the answer changes, because this runs on
     // every scroll frame and textContent is a layout-affecting write.
