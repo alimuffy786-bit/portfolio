@@ -2738,13 +2738,11 @@ if (bingoWrap) {
 //   view    a place was CHOSEN. The gate is not rendered, exactly one `[data-view]` section is, the
 //           footer is back, and the head sits over them at `--head-h`.
 //
-// THERE IS NO TRAVEL, SO THERE IS NOTHING TO STOP HALF WAY. The gate used to be 250vh and the scroll
-// WAS the index: a reader who stopped scrolling left the contents half-open, and closing them meant
-// scrubbing the whole block backwards. Pass 2D replaced that with an OWNED number — `state.p`, 0 for
-// the cover and 1 for the index — and `commit()` is the only writer of it. Nothing in the document
-// can put the plates at a third position, because no scroll position means anything inside the gate
-// any more. That is also why `readMode()` can answer from `mode` alone: the geometry has one answer
-// in both states, so the state itself is the honest source.
+// NOTHING CAN STOP HALF WAY. `state.p` is an OWNED number — 0 for the cover, 1 for the index — and
+// `commit()` is its only writer. No scroll position means anything inside the gate, so nothing in
+// the document can put the plates at a third position. That is also why `readMode()` can answer
+// from `mode` alone: the geometry has one answer in both states, so the state itself is the honest
+// source.
 //
 // THE HARD STOP IS A HEIGHT, NOT A GUARD. In the cover and the index the four sections and the
 // footer are collapsed to `height:0` and clipped (stylesheet, §16), so the page physically ends on
@@ -3372,13 +3370,11 @@ if (bingoWrap) {
   // ═══════════════════════════════════════════════════════════════════════════
   // THE GATE IS A DECISION, NOT A DISTANCE (§16d)
   // ═══════════════════════════════════════════════════════════════════════════
-  // The gate used to be 250vh of travel and the scroll WAS the index: a reader who stopped half way
-  // left the contents half-open, and a reader who wanted the poster again had to scrub the whole
-  // block backwards. Both were one-line requests dressed up as a kilometre. Pass 2D retired the
-  // travel — `#gate` is exactly one screen, so `window.scrollY` is 0 in both of its states — and the
-  // gate now owns its progress in `state.p`. That is what makes ONE TICK enough: there is no
-  // half-open index to protect, and a commit is cheap to undo, because the opposite tick plays the
-  // same tween back over the same 0.85s.
+  // ── one tick, because there is no half-open index to protect ──
+  // One tick is enough: `#gate` is exactly one
+  // screen, so `window.scrollY` is 0 in both of its states and the gate owns its progress in
+  // `state.p`. A commit is cheap to undo — the opposite tick plays the same tween back over the
+  // same 0.85s.
   //
   // WHAT COUNTS AS A DECISION: one wheel notch, one thumb, one arrow key. `INTENT_COOLDOWN` is the
   // only guard kept from the old flick layer — a trackpad's inertia keeps producing notches after
@@ -3643,7 +3639,7 @@ if (bingoWrap) {
   // is the transition a reader gets.
   // The three routes are called with `instant` here — the harness is driving STATE, not time, and
   // the animated version of each is exercised through the real press it belongs to (a block, a
-  // panel, ← INDEX, a BACK TO INDEX, the pull-up), which is what SB and SC assert.
+  // panel, ← INDEX, a BACK TO INDEX, the pull-up), which is what the runtime suite drives.
   window.__ad = window.__ad || {};
   Object.assign(window.__ad, {
     mode: () => mode,

@@ -36,9 +36,8 @@
      hero's masthead is the one face the page cannot fall back on gracefully, so it is preloaded
      with `crossorigin` (the font is always fetched in CORS mode, even same-origin — a preload
      without it is a second download, not a warm cache) and swapped in as soon as it lands.
-     WOFF2 ONLY: the 200,152 B TrueType master stays in `fonts/` as the source that was converted,
-     but nothing requests it — one face, one file, one download, and the preload's `type` matches
-     the bytes on the wire so a browser that cannot decode them skips the fetch instead of wasting it. -->
+     WOFF2 ONLY: one face, one file, one download, and the preload's `type` matches the bytes on
+     the wire so a browser that cannot decode them skips the fetch instead of wasting it. -->
 <link rel="preload" href="fonts/JSL-Blackletter-Normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 /* ==========================================================
@@ -54,11 +53,12 @@
    (the name and the gear), and it is never asked to set a paragraph. `swap` is deliberate — the
    name is measurable in the fallback serif in the first frame, and main.js re-fits on
    fonts.ready, so the block is never held empty by the face.
-   WOFF2, AND ONLY WOFF2: the same outlines as the 200,152 B TrueType master at 84,716 B (−58%),
-   which is a third of a megabyte of bytes the visitor never pays for. No `truetype` fallback in
-   the src list on purpose — every browser that can render this sheet (2026: Chrome 36+, Safari
-   12+, Firefox 39+, Edge 14+) decodes Brotli-compressed WOFF2, so a second URL would only ever be
-   a wasted cache entry. The `.ttf` stays in the repo as the master, never as an alternative. */
+   WOFF2, AND ONLY WOFF2: 84,716 B against the 200,152 B TrueType it was converted from (−58%),
+   which is a third of a megabyte the visitor never pays for. No `truetype` fallback in the src
+   list on purpose — every browser that can render this sheet (2026: Chrome 36+, Safari 12+,
+   Firefox 39+, Edge 14+) decodes Brotli-compressed WOFF2, so a second URL would only ever be a
+   wasted cache entry. The `.ttf` is not in the repo: it is no longer the master of anything, the
+   outlines are in the WOFF2, and an unrequested 200 KB file is a museum piece, not a source. */
 @font-face{
   font-family:'JSL Blackletter';
   src:url('fonts/JSL-Blackletter-Normal.woff2') format('woff2');
@@ -88,7 +88,7 @@
 /* -- 01 TOKENS ---------------------------------------- */
 :root{
   --dark:#14100C; --bone:#EDE6D4; --accent:#7A1818; --brass:#7D5A1F;
-  --ink:#111929; --deep:#0D1520;
+  --ink:#111929;
   /* AA FIXES, RE-DERIVED RATHER THAN NUDGED. --muted is the bone sheet's quiet ink and was 3.4:1
      against #EDE6D4; #6E6050 is 4.9:1. --muted-dark is the ink sheet's quiet bone and was 40%
      opacity (3.1:1 on #14100C); 62% is 6.1:1. --brass is a rule, a numeral and a rail fill, and
@@ -109,13 +109,11 @@
      becomes 2x2 and the token is restated to 130px in that media block, so the hero shortens with
      it and the page's first fold is still one viewport. */
   --board-h:72px;
-  /* §16d THE GATE IS ONE SCREEN — THERE IS NO TRAVEL TOKEN ANY MORE. Pass 2D retired the 250vh
-     gate: a scroll past the fold used to scrub the index, which meant the index could be opened
-     half-way and closed by a reader who had not decided anything. `.gate` is now `100svh`, the
-     stage is a plain relative box of the same height, and the transition between cover and index
-     is OWNED by the module — one tween of its own progress, from a gesture that meant it. There
-     is therefore no CSS length whose fallback order (`vh` then `svh`) has to agree with a script:
-     the module's target is the only number in the machine. */
+  /* §16d THE GATE IS ONE SCREEN — THERE IS NO TRAVEL TOKEN. `.gate` is `100svh`, the stage is a
+     plain relative box of the same height, and the transition between cover and index is OWNED by
+     the module — one tween of its own progress, from a gesture that meant it. There is therefore
+     no CSS length whose fallback order (`vh` then `svh`) has to agree with a script: the module's
+     target is the only number in the machine. */
   /* THE TWO DRAWN ARROWS (§16). The gate's controls are printed marks, and a printed mark cannot be
      a codepoint that the sheet's own faces do not carry: U+2191 and U+2190 both fall through to a
      system face whose weight and width do not match the label beside them, so the "arrow" read as
@@ -218,11 +216,10 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
 .skip-link:focus{transform:none;outline:2px solid var(--dark);outline-offset:2px;}
 
 /* GRAIN — varies by section via opacity classes */
-:is(.grain-heavy,.grain-light,.grain-deep)::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+:is(.grain-heavy,.grain-light)::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
   background-image:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.84' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='280' height='280' filter='url(%23n)'/></svg>");}
 .grain-heavy::after{opacity:0.07;}
 .grain-light::after{opacity:0.035;}
-.grain-deep::after{opacity:0.1;}
 
 /* .case/#magazine are static by default; the overlay needs a containing block.
    (Every other grain host already declares position: relative/fixed later in this sheet.) */
@@ -743,7 +740,7 @@ html[data-phase="hero"] .head-bar{background:transparent;border-bottom-color:tra
    getComputedStyle — so these two rules restate the hex and the number is written down here instead. */
 #hero,.hero__title,.name-line,.hero__folio,.folio-vol,.folio-date,.folio-clock,.hero-fold,
 .hero-gear-asterisk,.site-head,.metroboard,.metro-block,.page-progress,.section-title,.work-title,
-.mag-display,.metro-t,.metro-n{
+.metro-t,.metro-n{
   -webkit-user-select:none;user-select:none;
 }
 p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.footnotes,.skills-line{
@@ -1132,10 +1129,8 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
 .footer-floor:hover .floor-arrow,.footer-floor:focus-visible .floor-arrow{transform:translate(2px,-2px);}
 
 /* -- 12 THE ROOM (hidden layer) + BINGO ---------------- */
-/* A TRAVERTINE GALLERY, NOT A DARK SCREEN. The wall used to be a cold navy (#0D1520)
-   carrying bone type: legible, but it read as a browser window rather than as a
-   building. Stone reads as architecture, so the overlay is now a room — warm field,
-   printed labels, one hairline everywhere, and nothing that glows.
+/* A TRAVERTINE GALLERY, NOT A DARK SCREEN. Stone reads as architecture, so the overlay is a
+   room — warm field, printed labels, one hairline everywhere, and nothing that glows.
 
    Four background layers do what a photograph of plaster would do: two blooms of light
    over two sets of horizontal veins at different scales and a slight angle to each
@@ -1143,7 +1138,7 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
    veins repeat and never cross. A fixed attachment keeps the light ambient while the
    room scrolls, which is what a wall does when you walk past it.
 
-   The palette is local and --tr- prefixed on purpose. --ink and --deep belong to
+   The palette is local and --tr- prefixed on purpose. --ink belongs to
    #magazine, and a gallery must not be able to re-tone a page it covers. Contrast
    measured against --tr-field #E4D9C5: ink 13.00:1 (a paragraph would pass), --tr-ink-2
    4.74:1 (reading copy), --tr-ink-3 3.16:1 (ornament only — a label, never a
@@ -1474,9 +1469,7 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
 }
 /* -- 13b1 TABLET — 768 to 1024, where a finger is on the glass but a desktop measure
    does not fit ------------------------------------------------------------- */
-/* The band straddles two worlds: above 800 it inherits the desktop rules and had no touch
-   floors at all; from 768 to 800 it inherited the 800 block, which was written for a
-   shrunken desktop rather than for a tablet standing on its side. Two blocks, on purpose:
+/* The band straddles two worlds, so it is two blocks, on purpose:
      A. the floors are additive — heights and hit boxes only, so no box that an audited
         measurement reads moves (1024×768 keeps its magazine columns, its footer row and
         its work sizes exactly);
@@ -1484,9 +1477,9 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
         scoped to the same 768–800 that the phone block and main.js's lfNarrowMQ use, so no
         width belongs to one and not the other. `--pad` needs no change: 5vw is 38.4 px at
         768 and 51.2 px at 1024, which is already a tablet margin.
-   Measured after the change at 768/834/1024 wide: 0 px of horizontal overflow, the
-   manifesto on 2 columns, the portrait column beside the text, the links and the footer on
-   one row, and every control at or above 44 px on the touch axis.
+   The floors apply to the whole 768–1024 range because above 800 the desktop rules have no
+   touch floors of their own, and 768–800 would otherwise inherit the 800 block — written for
+   a shrunken desktop, not for a tablet standing on its side.
    Deliberately NOT changed here: the stacked art work and its tap-to-reveal placard
    (there is no hover on a tablet, so the 800 block is right), the leaflet's axis and
    --lf-w (main.js lfNarrowMQ is `(max-width:800px)` and must agree with the CSS), and
@@ -1534,17 +1527,14 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
     padding-left:clamp(1.2rem,3vw,2.2rem);padding-top:0;}
 }
 /* -- 13c WIDESCREEN FOUNDATION — the frame and the measure -------------
-   The page had no macro grid: every band was `padding-inline: 5vw`, so at 2560 the text
-   ran 2304px wide and at 3840 it ran 3456px wide, and the only thing that ever stopped it
-   was a section's own max-width. Above 1200 there is now ONE frame (1280px, held by
-   --gutter as padding rather than by a max-width box, so every full-bleed background stays
-   full-bleed) and ONE measure for prose (42ch). There is no margin rail: the earlier
-   two-column skeleton spent 283px per section on apparatus, which starved the visual blocks
-   that are the reason a page is 1280 wide in the first place.
+   Above 1200 there is ONE frame (1280px, held by --gutter as padding rather than by a
+   max-width box, so every full-bleed background stays full-bleed) and ONE measure for prose
+   (42ch). There is no margin rail: apparatus eats the visual blocks that are the reason a page
+   is 1280 wide in the first place.
 
    WHY 1200 AND NOT 1025. The 1025-1199 band already carries the desktop measure and its own
    `.who-body` split, and at those widths the frame is still exactly 5vw per side (see the
-   token), so the block could only change it by taking padding away from the case sheets.
+   token), so this block could only change it by taking padding away from the case sheets.
    1200 is the first width where a single 1280 frame is meaningfully different from 5vw.
 
    WHAT THE WIDTH IS FOR. Prose is capped at --measure (~343px at the 17px root); the visual
@@ -1554,10 +1544,9 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
    reading set against wide gestures, not a page stretched to fill a screen.
 
    WHAT IS DELIBERATELY UNTOUCHED. #magazine keeps its full bleed and gains only the frame —
-   no rules, no borders (§10 is a flat field, and six measurements in the suite assert it
-   has no border, no fill and exactly one left edge). #hero, the leaflet sheet, the art room,
-   .art-wall and .art-ledger keep their own geometry — they are Phase 2. Nothing below 1200
-   sees a single declaration from this block, and nothing above it sees a different --pad:
+   no rules, no borders (§10 is a flat field). #hero, the leaflet sheet, the art room,
+   .art-wall and .art-ledger keep their own geometry. Nothing below 1200 sees a single
+   declaration from this block, and nothing above it sees a different --pad:
    --gutter IS --pad until 1422px. */
 
 /* THE WRAPPER IS TRANSPARENT BELOW 1200. #who/#work/#reach each gained a .frame-main wrapper,
@@ -1704,7 +1693,7 @@ p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.f
    REACH, the footer and the register clears 44px on the axis a thumb lands on.
    The deck is deliberately written as a horizontal track whose slides are still
    `flex-direction:column` rows: the work and its placard keep the relationship the wall
-   has everywhere else, and a non-row slide keeps the STEP 6 label clause honest. */
+   has everywhere else, so the label clause holds in a deck exactly as it does on the wall. */
 @media(max-width:767.98px){
   /* D7 — A THIRD LIST IS ONE TOO MANY ON A PHONE. The contents strip under the sheet already
      prints these four names at 390px, and the breadcrumb's list holds them as 44px rows, so the
@@ -1835,29 +1824,25 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
    honest fallback: content first, choreography only where there is a script to perform it.
    THE THREE STATES:
      cover  the fold, and nothing else. The head is GONE (a nav bar on a poster is a leak) and the
-            skip link with it; the board is the only exit and it sits where it always sat. The
-            document ends on the board's last pixel, because the broadsheet is `hidden`.
+            skip link with it; the board is the only exit. The document ends on the board's last
+            pixel, because the broadsheet is `hidden`.
      index  the reader is scrubbing the gate: the sheet is pinned and the four inks rise behind it
-            as `--gate-p` runs 0 → 1 over the gate's own travel, with the four panels laid over
-            the flood at the end of it. The head is still gone: you are inside the contents page,
-            not the site.
+            as `--gate-p` runs 0 → 1, with the four panels laid over the flood at the end of it.
+            The head is still gone: you are inside the contents page, not the site.
      view   a place was CHOSEN — by a block, a panel, or a deep link — and never scrolled to. The
             gate is not rendered, exactly one section is, and the head is back over it at
             `--head-h`.
    THE GATE IS EXACTLY ONE SCREEN, AND THE MODULE OWNS THE TRANSITION. `.gate` and `.gate-stage`
    are both `100svh`: there is no scroll travel inside the gate at all — `window.scrollY` is 0 in
    the cover and in the index — so the fold cannot end up half-open because a reader stopped
-   scrolling. The module keeps its own progress (0 = cover, 1 = index) and tweens it with GSAP
-   over 0.85s (0.7s on a phone); the stylesheet only says what the two ends look like. That is why
+   scrolling. The module tweens its own progress (0 = cover, 1 = index) over 0.85s (0.7s on a
+   phone); the stylesheet only says what the two ends look like. That is why
    `overscroll-behavior:none` is declared for the gate's two states: a wheel at the fold has
    nowhere to chain to, so the intent layer is free to read it as a decision.
    THE STAGE IS STILL A REAL BOX. `.gate-stage` is `position:relative`, not sticky, so it remains
-   the panels container's `offsetParent` exactly as before, and `overflow:clip` still clips the
-   sheet to the fold — the morph's coordinate space, the board's floor and the sheet's
-   `max-height` are all unchanged by the gate shrinking.
-   NO STICKY ANCESTOR MAY SCROLL-CLIP. Now that nothing is sticky this no longer decides whether
-   the index works, but the rule is kept: the gate still declares no `overflow`, and the stage
-   itself carries `overflow:clip`, which clips without creating a scroll container.
+   the panels container's `offsetParent`, and `overflow:clip` still clips the sheet to the fold
+   without creating a scroll container — the morph's coordinate space, the board's floor and the
+   sheet's `max-height` are unchanged by the gate being one screen instead of three.
    THE HARD STOP IS A HEIGHT, NOT A SCROLL GUARD. In the cover and the index the four
    `[data-view]` sections and the footer are COLLAPSED to `height:0` and clipped, so the document
    physically ENDS on the gate's last pixel: there is nothing below the contents to scroll into and
@@ -2166,7 +2151,7 @@ html[data-motion="off"] #flood{transition:none;}
   .rp-layer{transform:none!important}
   .sound-wave .wv{transform:scaleY(0.5)!important}
   .clip-img,.eid-reveal,.who-photo{animation:none!important}
-  .grain-heavy::after,.grain-light::after,.grain-deep::after{opacity:0}
+  .grain-heavy::after,.grain-light::after{opacity:0}
   .frame{transition:none!important}
   #cur,.art-overlay,.lf-room,.lf-ground{transition:none}
   /* every new piece of motion owes this query an off-switch */
