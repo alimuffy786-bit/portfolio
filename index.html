@@ -18,6 +18,14 @@
 <meta name="twitter:image" content="https://aliasgardalal.netlify.app/images/hero-photo.png">
 <meta name="theme-color" content="#14100C">
 <link rel="canonical" href="https://aliasgardalal.netlify.app/">
+<!-- SCROLL RESTORATION IS HANDED TO THE GATE (§16). The gate's three states are heights, not just
+     attributes: the cover and the index are 250vh and a view is one section, so a browser that
+     restored the offset it remembered would drop the reader into a document of a different length
+     and 0.4s later the module would move them again. `manual` makes the module the only writer of
+     a scroll position — deep links are honoured from the hash at boot, and everything else starts
+     at the top of the state it derives. This has to run before the first paint, so it is inline
+     and it is first. -->
+<script>try{history.scrollRestoration='manual';}catch(e){}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'><rect width='64' height='64' rx='10' fill='%23111929'/><g stroke='%23EDE6D4' stroke-width='7' stroke-linecap='round'><path d='M32 12v40M14.7 20l34.6 24M49.3 20L14.7 44'/></g></svg>">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -58,28 +66,74 @@
   font-style:normal;
   font-display:swap;
 }
+/* THE TWO TEXT FACES (§06 folio). Both are already in `fonts/` and neither is on the critical path:
+   they set ONE line each — the left folio rail and the dateline / clock — so they load with
+   `swap` and are deliberately NOT preloaded. The masthead is the only face the page cannot fall
+   back on gracefully, and it is the only one the document asks for up front. */
+@font-face{
+  font-family:'Old Newspaper Types';
+  src:url('fonts/OldNewspaperTypes.woff2') format('woff2');
+  font-weight:400;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:'The Story of Nothing';
+  src:url('fonts/The Story of Nothing.woff2') format('woff2');
+  font-weight:400;
+  font-style:normal;
+  font-display:swap;
+}
 
 /* -- 01 TOKENS ---------------------------------------- */
 :root{
-  --dark:#14100C; --bone:#EDE6D4; --accent:#7A1818; --brass:#9E7428;
+  --dark:#14100C; --bone:#EDE6D4; --accent:#7A1818; --brass:#7D5A1F;
   --ink:#111929; --deep:#0D1520;
-  --muted:#8C7C6A; --muted-dark:rgba(237,230,212,0.4);
+  /* AA FIXES, RE-DERIVED RATHER THAN NUDGED. --muted is the bone sheet's quiet ink and was 3.4:1
+     against #EDE6D4; #6E6050 is 4.9:1. --muted-dark is the ink sheet's quiet bone and was 40%
+     opacity (3.1:1 on #14100C); 62% is 6.1:1. --brass is a rule, a numeral and a rail fill, and
+     at #9E7428 it was 3.5:1 on bone; #7D5A1F is 5.2:1 — still brass, now legible as type. */
+  --muted:#6E6050; --muted-dark:rgba(237,230,212,0.62);
   --rule:rgba(20,16,12,0.12); --rule-dark:rgba(237,230,212,0.1);
   /* one device pixel at DPR>=2; rounds to 1px at DPR1, so it never disappears */
   --hairline:0.5px;
   --serif:'Cormorant Garamond',serif; --eb:'EB Garamond',serif; --mono:'Space Mono',monospace;
   --serif-gothic:'JSL Blackletter','Cormorant Garamond',serif;
-  /* THE STRIP'S HEIGHT (§06b). The hero has to be exactly one screen MINUS this band, so the
-     measurement lives in one place: the strip's own height is `var(--marquee-h)` and the hero's
-     height subtracts the same token. Root is 106.25%, so this is 44.2px — the number the dock
-     was already landing on, now stated once instead of measured from an element. */
-  --marquee-h:2.6rem;
-  /* THE POP (§05a). Every link in the head's row carries one inline `--pop`, and each value is a
-     colour the page already prints — brass, oxblood, the riso rose, bone — never a fourth palette
-     invented for the bar. The root value is the signboard's own brass, so a link that set no inline
-     still fills its square with something that belongs to the sheet, and `var(--pop)` always
-     resolves (8a.16 can prove it). */
-  --pop:var(--brass);
+  /* §06 FOLIO — one grunge newspaper face and one editorial display cut, each used at a single
+     small size so a fallback is a different shape and never a different layout. */
+  --serif-grunge:'Old Newspaper Types','EB Garamond',serif;
+  --serif-editorial:'The Story of Nothing','Cormorant Garamond',serif;
+  /* THE BOARD'S HEIGHT (§06b). The hero is exactly one screen MINUS this band, so the measurement
+     lives in one place: `.metroboard` is `var(--board-h)` tall and #hero subtracts the same token.
+     72px is four 44px targets with 2px gutters and room to breathe at 1440; below 640 the board
+     becomes 2x2 and the token is restated to 130px in that media block, so the hero shortens with
+     it and the page's first fold is still one viewport. */
+  --board-h:72px;
+  /* §16d THE GATE IS ONE SCREEN — THERE IS NO TRAVEL TOKEN ANY MORE. Pass 2D retired the 250vh
+     gate: a scroll past the fold used to scrub the index, which meant the index could be opened
+     half-way and closed by a reader who had not decided anything. `.gate` is now `100svh`, the
+     stage is a plain relative box of the same height, and the transition between cover and index
+     is OWNED by the module — one tween of its own progress, from a gesture that meant it. There
+     is therefore no CSS length whose fallback order (`vh` then `svh`) has to agree with a script:
+     the module's target is the only number in the machine. */
+  /* THE TWO DRAWN ARROWS (§16). The gate's controls are printed marks, and a printed mark cannot be
+     a codepoint that the sheet's own faces do not carry: U+2191 and U+2190 both fall through to a
+     system face whose weight and width do not match the label beside them, so the "arrow" read as
+     a character from another book. Each is a 12x12 inline SVG painted through `mask`, which means
+     the ink is still `currentColor` — the hover rule on the button recolours the arrow and the
+     words in one declaration, and nothing here is fetched. */
+  --arrow-up:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 10.4V1.6M2.2 5.4L6 1.6l3.8 3.8' fill='none' stroke='%23000' stroke-width='1.6'/%3E%3C/svg%3E");
+  --arrow-left:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1.6 6h8.8M5.6 2.2L1.6 6l4 3.8' fill='none' stroke='%23000' stroke-width='1.6'/%3E%3C/svg%3E");
+--arrow-right:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1.6 6h8.8M7.4 2.2L11.4 6l-4 3.8' fill='none' stroke='%23000' stroke-width='1.6'/%3E%3C/svg%3E");
+  /* THE HEAD'S OWN HEIGHT (§05). Fixed, because the bar never hides: the hero's folio clears it by
+     this number instead of by a guessed padding, and the head's box is the same at every width. */
+  --head-h:3.4rem;
+  /* THE POP (§05a, §06b) — FOUR PRINTED INKS, SHARED BY THE BAR AND THE BOARD. One palette for
+     both surfaces means hovering a place in the head and arriving at that place on the board are
+     the same colour, and the doc's `--pop` default is the green the first block wears so a link
+     that set no inline still fills its square with something the page prints. */
+  --pop-1:#A8D173; --pop-2:#FF4F38; --pop-3:#FFE81A; --pop-4:#9ED8F5;
+  --pop:var(--pop-1);
   --pad:5vw;
   /* THE MACRO GRID (§13c) — a second, wider token that does not replace --pad.
      --pad is 5vw at every width and is consumed by three phone mechanisms that a moving
@@ -150,8 +204,18 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
 .metric-val,.mi-val,.big-stat,.ops-num,.case-date,.log-date,.log-outcome,.outcome-line,.wall-caption{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
 
 /* -- 04 SHARED PRIMITIVES ----------------------------- */
-/* FIXED NAV CLEARANCE — in-page anchors land below the nav, not behind it */
-#fn1,#fn2,#ref1,#ref2,#who,#work,#reach,#magazine{scroll-margin-top:5.5rem;}
+/* FIXED NAV CLEARANCE — in-page anchors land below the head, not behind it. The clearance is the
+   head's own token plus air, so shortening the bar (§05) shortens the landing with it. */
+#fn1,#fn2,#ref1,#ref2,#who,#work,#reach,#magazine{scroll-margin-top:calc(var(--head-h) + 1.4rem);}
+
+/* THE WAY PAST THE HEAD (§08). A fixed bar is the first thing in the tab order on every page that
+   has one, so the first Tab stop is the way over it: the link is a 1px box until it takes focus,
+   then it drops under the head as a paper tab with an ink rule. `:focus`, not `:focus-visible` —
+   a skip link is only ever reached by a keyboard, and hiding it from a programmatic focus is the
+   one thing it must never do. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
+.skip-link{position:fixed;top:0;left:var(--pad);z-index:600;padding:0.55rem 0.9rem;font-family:var(--mono);font-size:0.6875rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--dark);text-decoration:none;background:#EAE7E0;border:1px solid var(--dark);transform:translateY(-140%);transition:transform 0.18s ease;}
+.skip-link:focus{transform:none;outline:2px solid var(--dark);outline-offset:2px;}
 
 /* GRAIN — varies by section via opacity classes */
 :is(.grain-heavy,.grain-light,.grain-deep)::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
@@ -197,97 +261,103 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    above every overlay makes a stray hit area the one thing that could swallow a press. */
 #cur,#cur *,#cur::before,#cur::after{pointer-events:none;}
 
-/* -- 05 NAV -------------------------------------------- */
-/* THE BAR IS A PLACE, NOT A MENU. Left: where you are — the section breadcrumb, which opens
-   the section list. Middle: the four places themselves (§05a) — the same list the strip prints,
-   on the desk only. Right: the gear that opens the settings drawer. The 01/02/03 numerals and
-   the sound mark moved out in Workstream B, and the asterisk is now the hero's mark.
-   `transform` (not `top`) is what Headroom drives in main.js — the bar leaves on a scroll down
-   and returns on the first scroll up, and a transform can never reflow the page or fight the
-   --sbw padding that keeps the bar off the scrollbar's edge. */
-/* THE HEAD IS TWO NODES, NOT ONE. `header.site-head` owns the fixed box and the stacking order;
-   `#siteNav` (.head-bar) is the row inside it, and it is the node main.js moves — so the bar's
-   `nav-hidden` transform and its scroll-written opacity both stay on the element the harness
-   measures, while the <header> carries the landmark. `pointer-events:none` on the wrapper keeps
-   the empty corners of the head from swallowing a press that belongs to the sheet. */
-.site-head{position:fixed;top:0;left:0;right:0;z-index:510;pointer-events:none;}
-.head-bar{position:relative;display:flex;justify-content:space-between;align-items:center;gap:1.5rem;padding:1.3rem var(--pad);padding-right:calc(var(--pad) + var(--sbw,0px));transition:transform 0.36s cubic-bezier(0.16,1,0.3,1);will-change:transform;pointer-events:auto;}
-.head-bar.nav-hidden{transform:translateY(-101%);}
-.head-bar::before{content:'';position:absolute;inset:0;z-index:-1;backdrop-filter:blur(10px);border-bottom:1px solid var(--rule-dark);background:rgba(20,16,12,0.82);}
-.nav-left{position:relative;display:flex;align-items:center;min-width:0;}
-/* The breadcrumb is a button, so it owes the UA chrome the same reset the old asterisk did:
-   no ButtonFace fill, no outset border, no radius. ::after finds the 44px touch floor around
-   the words without moving them off the --pad line, which is what a negative margin would do.
-   The label ellipsises rather than pushing the gear off the bar on a narrow phone. */
-.nav-bc{position:relative;display:inline-flex;align-items:center;gap:0.55rem;min-width:0;font-family:var(--mono);font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted-dark);background:none;border:0;border-radius:0;padding:0.3rem 0;appearance:none;-webkit-appearance:none;cursor:none;transition:color 0.25s ease;white-space:nowrap;}
-.nav-bc::after{content:'';position:absolute;inset:-0.9rem -0.7rem;}
-.nav-bc:hover,.nav-bc[aria-expanded="true"]{color:var(--bone);}
-.nav-bc:focus-visible{outline:2px solid var(--bone);outline-offset:4px;}
-.nav-bc-label{overflow:hidden;text-overflow:ellipsis;}
-.nav-bc-caret{flex:0 0 auto;display:inline-block;font-size:0.72em;line-height:1;transform-origin:50% 50%;transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);}
-.nav-bc[aria-expanded="true"] .nav-bc-caret{transform:rotate(180deg);}
-/* THE MENU — a disclosure under the bar, not a modal: five rows, no scrim, no focus trap.
-   It is anchored to .nav-left, so it opens on the breadcrumb's own line at every width, and
-   its max-width keeps it inside the phone's padding. The offset adds the bar's own 1.3rem of
-   block padding to the breadcrumb's box before the 0.85rem gap, so the panel starts *under*
-   the bar's hairline instead of 8px inside it — an anchored sheet, not a stuck-on one. */
-.nav-menu{position:absolute;top:calc(100% + 1.3rem + 0.85rem);left:0;z-index:1;min-width:16.5rem;max-width:calc(100vw - 2 * var(--pad));padding:0.35rem 0;background:rgba(20,16,12,0.97);border:var(--hairline) solid var(--rule-dark);box-shadow:0 22px 50px rgba(0,0,0,0.45);}
-.nav-menu[hidden]{display:none;}
-.nav-menu-list{list-style:none;}
-/* 0.9rem of block padding puts every row over the 44px floor (§05b) on its own: the mono
-   line box is ~15.6px, so the row measures ~46px and the list measures ~231px — five rows,
-   each one a target, none of them padded out with a wrapper that does nothing else. */
-.nav-menu-link{display:flex;align-items:baseline;gap:1.1rem;padding:0.9rem 1.1rem;font-family:var(--mono);font-size:0.56rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted-dark);text-decoration:none;cursor:none;}
-.nav-menu-link:hover,.nav-menu-link:focus-visible{color:var(--bone);background:rgba(237,230,212,0.05);}
-.nav-menu-link:focus-visible{outline:1px solid var(--bone);outline-offset:-1px;}
-/* the section you are in stays lit while the list is open — the breadcrumb's label, repeated */
-.nav-menu-link[aria-current="location"]{color:var(--bone);}
-.nav-menu-n{flex:0 0 1.7rem;font-size:0.92em;color:rgba(237,230,212,0.34);}
-.nav-menu-link[aria-current="location"] .nav-menu-n{color:var(--brass);}
-/* the archive row is a door, not a section — ruled off from the four above it */
-.nav-menu-door{margin-top:0.35rem;padding-top:0.9rem;border-top:var(--hairline) solid var(--rule-dark);}
-/* THE GEAR — an icon, not a word: the bar's one control, and the drawer's only handle.
-   ::after carries the 44px target so the glyph can stay 19px and sit on the type's line. */
-.nav-gear{position:relative;display:grid;place-items:center;flex:0 0 auto;width:1.1rem;height:1.1rem;padding:0;background:none;border:0;border-radius:0;color:var(--muted-dark);appearance:none;-webkit-appearance:none;cursor:none;transition:color 0.25s ease;}
+/* -- 05 HEAD (the bar) ---------------------------------
+   THE BAR IS A PLACE, NOT A MENU — and it is THREE ZONES on one fixed line: where you are (the
+   masthead's own name, which is a link home), the four places the page is made of (§05a, desk
+   only), and the two controls (sound, settings). It never hides and it never auto-plays anything:
+   the old Headroom slide, the breadcrumb that opened a section list and the scroll-written
+   opacity all went with the marquee (§06b), and what is left is a rule that can be measured.
+   TWO NODES, NOT ONE. `header.site-head` owns the fixed box and the stacking order; `#siteNav`
+   (.head-bar) is the row inside it — the node the harness measures — and `pointer-events:none` on
+   the wrapper keeps the empty corners of the head from swallowing a press that belongs to the
+   sheet. The palette is scoped here exactly as it is on #hero: the head sits on the same warm
+   stock, so `--ink` and `--paper` are re-declared rather than borrowed from `:root` (whose `--ink`
+   is the navy chrome token the wall and the reticle already consume).
+
+   THE PHASE IS ONE ATTRIBUTE (§06). `html[data-phase]` is written by ONE IntersectionObserver on
+   #hero in main.js: `hero` while the sheet is under the head (transparent bar, ink type on
+   newsprint), `sheet` once the sheet has left it (opaque paper + a 1px --frame hairline). The
+   default — no script at all — is the opaque bar: a bar you can read is worth more than a
+   transparent one, so the JS-off page gets the sheet state and never a floating line of ink. */
+.site-head{position:fixed;top:0;left:0;right:0;z-index:510;pointer-events:none;--ink:#141110;--paper:#EAE7E0;--rule-ink:rgba(20,17,16,0.14);}
+.head-bar{position:relative;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.5rem;height:var(--head-h);padding:0 var(--pad);padding-right:calc(var(--pad) + var(--sbw,0px));pointer-events:auto;color:var(--ink);background:var(--paper);border-bottom:1px solid var(--frame);transition:background-color 0.3s ease,border-color 0.3s ease;}
+html[data-phase="hero"] .head-bar{background:transparent;border-bottom-color:transparent;}
+/* LEFT — the name, and therefore the way home. One link, mono at the 11px label floor, the
+   volume in --muted so the name reads first and the edition reads second. */
+/* ELLIPSIS, NOT A COLLISION. On a 390 bar the name and the two controls share 1fr/1fr across a
+   shrunken grid, so the brand is the node that gives: it keeps its own box, clips its own text and
+   prints a real ellipsis rather than running under the wave. `min-width:0` is what lets a flex/grid
+   child go smaller than its content at all — without it nothing below would engage. */
+.head-brand{justify-self:start;display:inline-flex;align-items:baseline;gap:0.4rem;min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:0.6875rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink);text-decoration:none;white-space:nowrap;cursor:none;}
+.head-brand span{color:var(--muted);}
+.head-brand:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
+/* RIGHT — the wave, then the gear. The gear keeps its own block below; the wave's label is a
+   visible word (not an icon alone) because "Sound" is the one control whose state is invisible. */
+/* The right zone never gives: the wave and the gear are both 44px-class targets on their own axis,
+   and a squeezed control is a control a thumb misses. The brand absorbs the shortfall instead. */
+.head-actions{justify-self:end;display:flex;align-items:center;gap:1.1rem;min-width:0;flex-shrink:0;}
+/* THE GEAR — an icon, not a word: the drawer's only handle. `::after` carries the 44px target so
+   the glyph can stay 19px and sit on the type's line. Ink on paper now, not bone on ink: the head
+   is the sheet's own surface (§05), so its hover is the sheet's ink, not a brighter bone. */
+.nav-gear{position:relative;display:grid;place-items:center;flex:0 0 auto;width:1.1rem;height:1.1rem;padding:0;background:none;border:0;border-radius:0;color:var(--ink);appearance:none;-webkit-appearance:none;cursor:none;transition:color 0.25s ease;}
 .nav-gear::after{content:'';position:absolute;inset:-0.95rem;}
 .nav-gear svg{display:block;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.15;stroke-linecap:round;}
-.nav-gear:hover,.nav-gear[aria-expanded="true"]{color:var(--bone);}
-.nav-gear:focus-visible{outline:2px solid var(--bone);outline-offset:4px;}
+.nav-gear:hover,.nav-gear[aria-expanded="true"]{color:var(--accent);}
+.nav-gear:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 /* -- 05a SECTION LINKS (head-nav) -----------------------
-   The bar is a place, and this is the part of it that names the four places the page is made of.
-   They are the same four the contents strip (§06b) prints under the sheet and the same four rows
-   the breadcrumb's list holds: one list of sections, drawn at four distances — a moving strip at
-   the fold, a row in the bar, rows in the list, one segment each on the progress rail. It is
-   hidden below 768, where the strip and the list already carry those four names and a third copy
-   would only crowd a 390px bar with targets too small to hit.
-   EACH LINK OWNS ONE `--pop` (inline), and its square fills with it on hover and on aria-current:
-   the colour its section already wears further down the page, so the bar and the page cannot drift
-   apart. The square is DRAWN, not typed — a 0.5rem box with a hairline that fills — because a
-   `▪` glyph changes size and baseline with every fallback face in the stack. */
-.head-nav{display:flex;align-items:center;gap:1.5rem;margin-left:auto;min-width:0;}
-.head-nav-link{position:relative;display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 0;font-family:var(--mono);font-size:0.62rem;letter-spacing:0.19em;text-transform:uppercase;color:var(--muted-dark);text-decoration:none;white-space:nowrap;cursor:none;transition:color 0.25s ease;}
-.head-nav-n{font-size:0.92em;color:rgba(237,230,212,0.34);transition:color 0.25s ease;}
-.head-nav-pop{flex:0 0 auto;display:block;width:0.5rem;height:0.5rem;background:transparent;border:var(--hairline) solid currentColor;transition:background 0.25s ease,border-color 0.25s ease;}
-.head-nav-link:hover,.head-nav-link:focus-visible,.head-nav-link[aria-current="location"]{color:var(--bone);}
-.head-nav-link:hover .head-nav-pop,.head-nav-link[aria-current="location"] .head-nav-pop{background:var(--pop);border-color:var(--pop);}
-.head-nav-link[aria-current="location"] .head-nav-n{color:var(--brass);}
-.head-nav-link:focus-visible{outline:2px solid var(--bone);outline-offset:4px;}
-/* between 768 and 1024 the labels would crowd the breadcrumb and the gear, so the row keeps its
-   numerals and its squares only; the breadcrumb already spells the section out in words. The row
-   is not given a width — it is just allowed to shrink (min-width:0 above), because a 100% item in
-   this flex row would fight `justify-content:space-between` for the gear's 44px. */
-@media (min-width:768px) and (max-width:1023.98px){
-  .head-nav{gap:1.1rem;}
-  .head-nav-link{padding-inline:0.1rem;}
-  .head-nav-label{display:none;}
+   THE FOUR PLACES, ON THE DESK ONLY. The same four the metroboard prints under the sheet (§06b)
+   and the same four the progress rail has a segment for: one list of sections, drawn at four
+   distances. Hidden below 768, where the board is the map and four targets on a 390px bar would
+   be neither readable nor hittable.
+   EACH LINK OWNS ONE `--pop` (inline, --pop-1..4), and its square fills with it on hover, on
+   focus and while the section is current — the colour the same place wears on the board, so the
+   bar and the board cannot drift apart. The square is a DRAWN 0.5rem box scaled from 0, not a
+   glyph: a `▪` changes size and baseline with every fallback face in the stack, and the transform
+   is the one property that can be animated without asking the bar for a layout. */
+.head-nav{justify-self:center;display:flex;align-items:center;gap:1.35rem;min-width:0;}
+.head-nav-link{position:relative;display:inline-flex;align-items:center;gap:0.45rem;padding:0.35rem 0;font-family:var(--mono);font-size:0.6875rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink);text-decoration:none;white-space:nowrap;cursor:none;}
+.head-nav-link::before{content:'';flex:0 0 auto;width:0.5rem;height:0.5rem;background:var(--pop);transform:scale(0);transform-origin:50% 50%;transition:transform 0.25s cubic-bezier(0.16,1,0.3,1);}
+.head-nav-link:hover::before,
+.head-nav-link:focus-visible::before,
+.head-nav-link[aria-current="location"]::before{transform:scale(1);}
+.head-nav-n{color:var(--muted);}
+.head-nav-link:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+/* BETWEEN 768 AND 1024 THE NAMES STAY. An earlier rule hid `.head-nav-label` below 900 on the
+   grounds that the words would crowd the brand — but at 834 the bar has room for four 11px words and
+   hiding them leaves four numerals and four squares that name nothing, which is a map drawn without
+   its towns. The row keeps its full labels across the whole tablet band and pays for them in the
+   tracking and the gap instead: 11px at 0.04em reads tighter than 11px at 0.16em without becoming a
+   different size, and the gap is allowed to breathe with the viewport rather than being pinned. */
+@media (min-width:768px) and (max-width:1024px){
+  .head-nav{gap:clamp(0.55rem,1.3vw,1.3rem);}
+  .head-nav-link{font-size:11px;letter-spacing:0.04em;}
+  .head-nav-label{display:inline;}
 }
-/* SOUND — the mark itself: an 8px ring whose fill is the state. It lives in the drawer now,
-   where the row is the target (see §05b), so the ::after hit box is not widened here. */
-.sound-toggle{position:relative;display:flex;align-items:center;gap:0.5rem;font-family:var(--mono);font-size:0.44rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted-dark);background:none;border:0;border-radius:0;appearance:none;-webkit-appearance:none;cursor:none;transition:color 0.25s;}
-.sound-ring{display:block;width:7px;height:7px;border:1px solid currentColor;border-radius:50%;transition:background 0.3s ease,box-shadow 0.3s ease;}
-.sound-toggle[aria-pressed="true"] .sound-ring{background:currentColor;box-shadow:0 0 0 2.5px rgba(237,230,212,0.07);}
-.sound-toggle:hover{color:var(--bone);}
-.sound-toggle:focus-visible{outline:2px solid var(--bone);outline-offset:4px;}
+/* A finger needs 44px, and the gear already pays for its own with a `::after` inset. The wave's box
+   is the button itself — it paints a 24x12 mark, which measured 41.6px of reach at the tablet floor —
+   so on a coarse pointer both controls are promoted to an explicit 44px square. The `::after` on the
+   gear is left alone: it already covers this case and two boxes would only fight each other. */
+@media (pointer:coarse){
+  #soundToggle,#setOpen{min-width:44px;min-height:44px;}
+}
+/* -- 05d SOUND — THE WAVE -------------------------------
+   FIVE BARS, AND THE STATE IS THE SHAPE. 5 <rect class="wv"> in a 26x14 box, 2.4 wide, rx 1.2,
+   filled with currentColor; at rest every bar is scaleY(.12), i.e. a 1.7px hairline — a mark, not
+   a widget. Sound on: each bar is tweened to a random height between .45 and 1 on its own
+   duration and phase (main.js §05d), so the group reads as a signal rather than a metronome.
+   Sound off: the tweens die and every bar settles to the hairline. `stillMotion()` never starts
+   the wave at all — it paints STATIC mid-height bars, which is the same instrument, held.
+   The label is a visible word, not just an icon: mute is invisible otherwise, and the control
+   owes the visitor a name it can read as well as hear. */
+.sound-toggle{display:inline-flex;align-items:center;gap:0.45rem;padding:0.35rem 0;font-family:var(--mono);font-size:0.6875rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink);background:none;border:0;border-radius:0;appearance:none;-webkit-appearance:none;cursor:none;transition:color 0.25s ease;}
+.sound-wave{display:block;width:1.55rem;height:0.8rem;overflow:visible;fill:currentColor;}
+.sound-wave .wv{transform-box:fill-box;transform-origin:50% 50%;transform:scaleY(0.12);}
+/* NO transition on .wv: GSAP writes the bars every frame while the wave is on, and a CSS
+   transition would smooth each write into the next — the one thing a per-bar tween cannot
+   survive. The rest state above is the no-script answer; the settle below is the scripted one. */
+.sound-wave .wv.settling{transition:transform 0.4s cubic-bezier(0.33,1,0.68,1);}
+.sound-toggle:hover{color:var(--accent);}
+.sound-toggle:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 /* `display:flex` above outranks the UA `[hidden]` rule, so hiding needs saying out loud */
 .sound-toggle[hidden]{display:none;}
 
@@ -317,12 +387,10 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    handler refuses this box, so the drawer scrolls natively on its own axis — the same contract
    the wall and the leaflet use. */
 .set-body{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:0.4rem clamp(1.2rem,4vw,1.8rem) 2rem;}
-/* THE ROWS. Sound keeps its own class and id (the audio module binds #soundToggle and owns its
-   aria-pressed contract); in the drawer the row itself is the target, so its old -0.9rem hit
-   box is dropped and the typography steps up to the drawer's size. */
-.set-drawer .sound-toggle{display:flex;align-items:center;justify-content:space-between;gap:1rem;width:100%;padding:1.05rem 0;font-size:0.58rem;letter-spacing:0.18em;color:var(--bone);border-bottom:var(--hairline) solid var(--rule-dark);}
-.set-drawer .sound-toggle::after{display:none;}
-.set-drawer .sound-ring{width:9px;height:9px;}
+/* THE ROWS. THE SOUND MARK IS NOT ONE OF THEM ANY MORE (§05d): it lives in the head beside the
+   gear, where the state can be seen without opening a panel, and where its aria-pressed contract
+   is unchanged — same id, same module, same storage key. The two switches below are the drawer's
+   whole business now. */
 .set-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;width:100%;padding:1.05rem 0;background:none;border:0;border-bottom:var(--hairline) solid var(--rule-dark);border-radius:0;font-family:var(--mono);font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--bone);text-align:left;appearance:none;-webkit-appearance:none;cursor:none;}
 .set-row:focus-visible{outline:2px solid var(--bone);outline-offset:2px;}
 /* aria-disabled, not `disabled`: the motion row stays legible and focusable when Accessibility
@@ -389,52 +457,76 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    is warm grey while the strip below the fold — which lives OUTSIDE #hero — stays on the night ink.
    `isolation` is load-bearing: the three riso passes multiply against THIS sheet, never through it
    to the bone page behind.
-   THE HEIGHT IS A CONTRACT. `100svh - var(--marquee-h)` (and a hard `100vh` at 1200+) is one
-   screen minus the contents strip, so the strip docks on the fold and the next band starts exactly
-   under it: the hero is viewport-locked, and the marquee is its handoff, not its overflow.
+   THE HEIGHT IS A CONTRACT. `100svh - var(--board-h)` (and a hard `100vh` at 1200+) is one screen
+   minus the metroboard, so the board is the next band and it starts exactly on the fold: the sheet
+   is viewport-locked and the board is what follows it, not what overflows it. Measured at 1440x900:
+   828 + 72 = 900 exactly.
    `--hero-pad` is the sheet's margin: --pad everywhere, 1.5rem where the phone block narrows it,
-   and --gutter from 1200 up, where the grid below takes over. */
-#hero{position:relative;min-height:calc(100svh - var(--marquee-h));display:grid;grid-template-columns:1fr;padding-left:var(--pad);overflow:hidden;background:var(--paper);color:var(--ink);isolation:isolate;--paper:#EAE7E0;--ink:#141110;--rule-ink:rgba(20,17,16,0.14);--hero-pad:var(--pad);touch-action:pan-y;}
+   and --gutter from 1200 up, where the grid below takes over.
+   THE TOP IS THE SHEET'S OWN MARGIN NOW, NOT THE HEAD'S. The gate hides the bar in the cover and
+   the index (§16), so the 3.4rem the folio used to reserve for a bar that is not there was a hole
+   at the top of the poster. The block padding is one clamp — deep enough to clear the two-row
+   folio on a phone, shallow enough that the masthead still sits in the optical centre of the fold
+   — and the folio is pinned to the sheet's own edge above it. */
+#hero{position:relative;min-height:calc(100svh - var(--board-h));display:grid;grid-template-columns:1fr;padding-left:var(--pad);padding-top:clamp(4.5rem,9vh,7rem);overflow:hidden;background:var(--paper);color:var(--ink);isolation:isolate;--paper:#EAE7E0;--ink:#141110;--rule-ink:rgba(20,17,16,0.14);--hero-pad:var(--pad);touch-action:pan-y;}
 /* THE STOCK — feTurbulence at three octaves over the paper, multiplied down so the grain reads as
    tooth rather than as fog. A filter, not a tile: the noise is generated at the element's own size,
    so a 2560px sheet never shows a 280px repeat. */
 .hero-paper{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0.34;mix-blend-mode:multiply;filter:url(#paperGrain);}
-/* THE CROP MARKS — four Ls, 13px each, on the gutter. They are the frame's corner brackets in a
-   printer's markup, not a border: nothing is drawn between them. aria-hidden, never hit. The ink
-   is the sheet's own (a warm near-black), not the chrome's muted bone. */
-.hero-crop{position:absolute;z-index:4;width:13px;height:13px;pointer-events:none;color:var(--rule-ink);opacity:0.9;}
-.hero-crop::before,.hero-crop::after{content:'';position:absolute;background:currentColor;}
-.hero-crop::before{width:100%;height:1px;}
-.hero-crop::after{width:1px;height:100%;}
-.crop-tl{left:var(--hero-pad);top:1.05rem;}
-.crop-tr{right:var(--hero-pad);top:1.05rem;}
-.crop-bl{left:var(--hero-pad);bottom:1.05rem;}
-.crop-br{right:var(--hero-pad);bottom:1.05rem;}
-.crop-tl::before,.crop-tr::before{top:0;}
-.crop-bl::before,.crop-br::before{bottom:0;}
-.crop-tl::before,.crop-bl::before{left:0;}
-.crop-tr::before,.crop-br::before{right:0;}
-.crop-tl::after,.crop-tr::after{top:0;}
-.crop-bl::after,.crop-br::after{bottom:0;}
-.crop-tl::after,.crop-bl::after{left:0;}
-.crop-tr::after,.crop-br::after{right:0;}
-/* THE REGISTRATION MARK — the crosshair a plate is aligned against, drawn inline so it is one
-   request lighter than a texture and can take the sheet's own ink colour. The paint lives on the
-   svg ITSELF (it is the element carrying this class), not on a descendant selector: the first
-   cut of this rule styled `.reg-crosshair svg`, matched nothing, and the browser's default black
-   fill duly painted a solid disc where a crosshair belongs. */
-.reg-crosshair{position:absolute;z-index:4;top:3.6rem;right:calc(var(--hero-pad) + 0.2rem);width:32px;height:32px;pointer-events:none;color:rgba(20,17,16,0.5);opacity:0.9;fill:none;stroke:currentColor;stroke-width:0.8;}
-/* THE SLUG IS GONE. The caption line (coordinates / plate number / Gulf clock), the hero asterisk
-   and the accent hairline under the name were the press sheet's furniture: three pieces of a
-   printed object that the broadsheet does not have. The broadsheet's furniture is the masthead,
-   the crops and the gear. Nothing replaces the slug, and #heroAsterisk, #heroClock and
-   `html.is-scrolled` are retired with it — main.js no longer writes the class, because the rule
-   that read it was the last thing on the page that did. */
+/* ═══ THE FOLIO (§06) ═════════════════════════════════════════════════════════════════════════
+   THE LINE ABOVE THE MASTHEAD — three zones on one grid, and everything on it is a fact about the
+   edition: the volume and the city (left), the dateline (centre), the clock (right).
+   IT IS ABSOLUTE, AND THAT IS THE POINT. The sheet's grid at 1200+ is two cells deep (stage and
+   plate) and the stage is vertically centred, so a folio that joined the grid would either steal a
+   row or overlap the masthead on a short screen. Laid against the sheet's own edges with
+   `--hero-pad`, it clears the head by `--head-h` and never argues with either child.
+   `pointer-events:none` — nothing here is a control; the clock is a reading, not a widget.
+   MOBILE IS TWO ROWS, NOT THREE COLUMNS: volume and clock share row 1 (the two things you check),
+   the dateline is centred under them, and "— SHARJAH, UAE" is dropped rather than wrapped, because
+   at 390px the city is the least useful word on the line and the footer already says it twice. */
+.hero__folio{position:absolute;left:var(--hero-pad);right:var(--hero-pad);top:clamp(1.1rem,2.4vh,1.9rem);z-index:4;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:baseline;column-gap:1.2rem;pointer-events:none;}
+/* THE LEFT RAIL GIVES FIRST. It is the only zone of the three that carries a sentence rather than a
+   fact, so when the three columns fight it is the volume that shortens: clipped on its own box and
+   ended with a real ellipsis, because an amputated word ("SHARJ") reads as a bug and "VOL. I — SHAR…"
+   reads as a column that ran out of room. The dateline and the clock keep their full measure. */
+.folio-vol{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:var(--serif-grunge);font-size:0.6875rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
+.folio-vol .folio-city{color:var(--muted);}
+/* THE DATELINE — the editorial face at its one size, flanked by two hairlines that flex to fill the
+   middle column. The rules ARE the punctuation: the em-dash between year and edition is a drawn
+   1.4em hairline, so the line cannot break on a dash and the two halves stay optically centred. */
+/* THE DATELINE IS ONE LINE, ALWAYS. `text-wrap:balance` was the wrong tool here: the middle zone is
+   an `auto` track on a three-column grid, so when the sheet narrows the browser balanced three words
+   into two lines and the folio grew a second row that the sheet's clearance had not budgeted for. A
+   dateline is one line by definition — a newspaper does not hyphenate its own flag — so the wrap is
+   switched off at every level: no wrapping inside the words, no wrapping of the items, no wrapping of
+   the flex line. The rules shrink and the volume ellipses instead. */
+.folio-date{margin:0;display:flex;align-items:center;justify-content:center;gap:0.7rem;min-width:0;flex-wrap:nowrap;white-space:nowrap;text-wrap:nowrap;font-family:var(--serif-editorial);font-size:clamp(1.05rem,1.8vw,1.45rem);line-height:1;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);}
+.folio-rule{flex:1 1 2rem;height:1px;min-width:1.2rem;background:var(--rule-ink);}
+.folio-sep{flex:0 0 1.4em;height:1px;background:var(--rule-ink);}
+/* THE CLOCK — grunge at the poster scale, HH:MM, 24-hour, and every digit in its own fixed-width
+   slot. The slots are what make the minute tick a flip instead of a reflow: the face is not
+   tabular in every browser's fallback, so the width is taken away from the glyph and given to the
+   box, and the harness can prove the line never moves. */
+.folio-clock{margin:0;justify-self:end;font-family:var(--serif-grunge);font-size:clamp(1.5rem,2.2vw,2rem);line-height:1;letter-spacing:0.02em;color:var(--ink);white-space:nowrap;}
+.folio-clock-face{display:inline-flex;align-items:baseline;font-variant-numeric:tabular-nums;}
+.folio-clock-face .dg{display:inline-block;width:0.58em;text-align:center;}
+.folio-clock-face .cl{display:inline-block;width:0.34em;text-align:center;animation:clockBlink 4s steps(1,end) infinite;}
+@keyframes clockBlink{0%,92%{opacity:1}93%,100%{opacity:0.35}}
+/* THE CENTRAL FOLD — the two 1px lines a broadsheet shows where it was folded: one of 5% ink, one
+   of the stock itself, side by side down the whole sheet. Drawn, never hit, and the only vertical
+   rule on the page. */
+.hero-fold{position:absolute;top:0;bottom:0;left:50%;width:1px;z-index:1;pointer-events:none;background:rgba(20,17,16,0.05);box-shadow:1px 0 0 var(--paper);}
 /* THE MASTHEAD. One h1, two rows, each row a word in the blackletter — the face does the shouting,
    so nothing is uppercased and nothing is letter-spaced. `opacity:0` until main.js reveals it: the
    reveal is a masked slide (below), and a line that has not been measured yet must not flash at
    the fallback size first. */
 .hero__title{opacity:0;transition:opacity 0.5s ease;font-weight:400;font-size:1rem;line-height:1;font-family:var(--serif-gothic);}
+/* THE SECOND PASS. A riso reprint is never perfectly registered, so hovering the masthead lays a
+   faint oxblood ghost 3px right and 2px down of the ink — as a text-shadow, not a duplicated word:
+   no second copy of the name in the accessibility tree, no pseudo-element carrying content, one
+   property that the compositor can hold. 9% of #7A1818 over newsprint is a shift you feel before
+   you can point at it. */
+.hero__title:hover .name-line{text-shadow:3px 2px 0 rgba(122,24,24,0.09);}
 /* min-width:0 keeps this grid item from being sized by its nowrap content:
    with `min-width:auto` a 178px name at 390px forced .hero__stage to 841px
    (clipped by #hero) and fitName() re-measured that inflated width, so the
@@ -446,7 +538,7 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    no JS measurement, no resize re-anchor, nothing to drift when the face lands. */
 .sticker-row{display:block;}
 .sticker-group{position:relative;display:inline-block;max-width:100%;}
-.name-line{display:block;font-family:var(--serif-gothic);font-weight:400;letter-spacing:0;line-height:0.92;white-space:nowrap;color:var(--ink);}
+.name-line{display:block;font-family:var(--serif-gothic);font-weight:400;letter-spacing:0;line-height:0.92;white-space:nowrap;color:var(--ink);transition:text-shadow 0.25s ease;}
 .line-1{font-weight:700;}
 .line-2{font-weight:400;}
 /* SMALL CAPS, NOT UPPERCASE. The second word is set `DALAL` as source text and rendered as
@@ -481,14 +573,31 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    and it is scoped to the sticker, so the sheet itself keeps `pan-y` and the page still scrolls
    when a thumb lands anywhere else. */
 .sticker-slot{position:absolute;inset:0;z-index:6;pointer-events:none;will-change:transform;}
-.sticker{position:absolute;left:78%;top:-40%;width:46%;aspect-ratio:1/1;display:block;padding:0;border:0;background:transparent;cursor:grab;pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none;transform-origin:50% 60%;-webkit-tap-highlight-color:transparent;}
-/* THE TWO PLATES ARE NOT THE SAME SHAPE — aliasgar is a 2000×2000 square, dalal is a 1918×657
-   wide — so the box follows each die-cut's own ratio instead of forcing both into a square and
-   letterboxing the wide one down to a third of its width. `left` past 75% is deliberate: the
-   stickers hang off the RIGHT of their words, so the masthead stays readable and the vinyl reads
-   as peeling off the page rather than pasted over the name. `top` alternates (above the first row,
-   below the second) so the two plates can never land on each other. */
-.sticker--dalal{left:82%;top:30%;width:56%;aspect-ratio:1918/657;}
+/* CENTRED OVER THE WORD, AND THE WORD'S OWN RATIO — BUT ON TWO NODES, NOT ONE. Each plate is the
+   word it covers, printed as a vinyl die-cut: 1905x461 for ALIASGAR and 1918x657 for DALAL, the two
+   files' own dimensions. `left/top:50%` + a -50%/-50% TRANSLATE centres the plate on its letters at
+   every viewport, and `width:86%`/`84%` is a percentage of the word (the `.sticker-group` above is an
+   inline-block, so its width IS the word's width). No JS measurement, nothing to drift.
+   THE CENTRING AND THE HAND ARE DIFFERENT NODES, AND THAT IS THE BUG FIX. `.sticker-home` owns the
+   percentage and the -50% translate and NOTHING ever tweens it. `.sticker` is the hand: it fills its
+   home with `inset:0` and its `transform` belongs wholly to GSAP/Draggable. Before the split one node
+   carried both, so a `fitName()` re-run (metrics → fonts.ready → resize) re-derived the percentage
+   width at the same moment `gsap.set(x/y/rotation)` was writing a matrix into that same box — the
+   offset was then measured against a width that changed under it and baked in. Two writers, one box.
+   Now the CSS box is computed from the word and never touched by script, and the matrix is computed
+   by script on a box whose own size is already final. They cannot disagree because they no longer
+   share a node. */
+.sticker-home{position:absolute;left:50%;top:50%;translate:-50% -50%;pointer-events:none;}
+.sticker{position:absolute;inset:0;display:block;padding:0;border:0;background:transparent;cursor:grab;pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none;transform-origin:50% 50%;-webkit-tap-highlight-color:transparent;}
+.sticker--aliasgar{width:86%;aspect-ratio:1905/461;}
+.sticker--dalal{width:84%;aspect-ratio:1918/657;}
+/* THE RESTING POSE IS ITS OWN NODE. A plate that is perfectly square to the type does not read as
+   something laid on top of it, so the wrapper carries a fixed few degrees and a couple of pixels —
+   and because those live on `.sticker__plate` (again as `rotate`/`translate`, never `transform`),
+   main.js's jitter and Draggable's drag can be absolute offsets from zero and never have to know
+   what the resting angle is. */
+.sticker__plate{position:absolute;inset:0;rotate:-2.4deg;translate:3px -2px;}
+.sticker--dalal .sticker__plate{rotate:1.8deg;translate:-4px 3px;}
 .sticker:active{cursor:grabbing;}
 /* THE SHADOW IS A SILHOUETTE, NOT A BOX. The first cut painted a rounded rectangle behind the
    plate, and on a die-cut with transparent corners that reads as a grey card, not as a shadow. So
@@ -498,12 +607,32 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
 .sticker__shadow img{display:block;width:100%;height:100%;object-fit:contain;filter:blur(14px) brightness(0.55) saturate(0);opacity:0.26;transform:translate(5px,11px);transition:filter 0.25s ease,transform 0.25s ease,opacity 0.25s ease;}
 .sticker__body{position:absolute;inset:0;display:block;transition:transform 0.25s ease;}
 .sticker__body img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none;user-select:none;}
+/* THE GLOSS IS TWO LIGHTS AND A CRUMPLE. The radial pair is the one light that follows the pointer —
+   two screen-blended bubbles, one ahead of the pointer and one behind it, written as CSS VARIABLES
+   (`--bubble-x` / `--bubble-y`) so they never touch the transform GSAP owns. The conic sheen is the
+   second light: a fixed anisotropic band at 30%/18% whose angle is offset by `--sheen-a`, which is
+   what tells the eye the surface is a POLYMER FILM and not a photograph of one — a vinyl die-cut
+   catches a hard, rotating linear streak across its face, and a radial alone reads as a soft bulb.
+   `filter:url(#glossWarp)` then displaces both gradients through a high-frequency noise field, so the
+   streak breaks into the tiny creases a real laminate has instead of lying perfectly flat.
+   COUNTER-PARALLAX: the highlight itself drifts AGAINST the pointer at 12%, which is what a specular
+   reflection does when the viewing angle changes — the light does not ride the surface, it slides
+   across it. `translate` (not `transform`) keeps it composable with everything else on this node. */
 .sticker__gloss{position:absolute;inset:0;border-radius:9%;pointer-events:none;mix-blend-mode:screen;opacity:0.72;
+  translate:calc(var(--bubble-x,0px) * -0.12) calc(var(--bubble-y,0px) * -0.12);
+  filter:url(#glossWarp);
   background:
     radial-gradient(38% 38% at calc(50% + var(--bubble-x,0px)) calc(50% + var(--bubble-y,0px)),rgba(255,255,255,0.62),rgba(255,255,255,0) 62%),
-    radial-gradient(22% 22% at calc(50% - var(--bubble-x,0px)) calc(50% - var(--bubble-y,0px)),rgba(255,255,255,0.4),rgba(255,255,255,0) 70%);}
+    radial-gradient(22% 22% at calc(50% - var(--bubble-x,0px)) calc(50% - var(--bubble-y,0px)),rgba(255,255,255,0.4),rgba(255,255,255,0) 70%),
+    conic-gradient(from calc(200deg + var(--sheen-a,0deg)) at 30% 18%,rgba(255,255,255,0) 0deg,rgba(255,255,255,0.34) 34deg,rgba(255,255,255,0.06) 78deg,rgba(255,255,255,0) 130deg,rgba(255,255,255,0.22) 196deg,rgba(255,255,255,0) 260deg,rgba(255,255,255,0) 360deg);}
+/* THE LIFT IS THREE THINGS AT ONCE, AND THEY ARGUE IN THE RIGHT ORDER: the silhouette drops further
+   and spreads (the plate has left the paper), the print flexes very slightly off-square (a vinyl that
+   is only scaled reads as a photograph being resized), and the laminate goes brighter because it is
+   now catching the room rather than the sheet. None of the three touches `.sticker`'s own transform,
+   which is the drag's. */
 .sticker.dragging .sticker__shadow img{filter:blur(20px) brightness(0.3) saturate(0);opacity:0.62;transform:translate(16px,28px) scale(1.02);}
-.sticker.dragging .sticker__body{transform:scale(1.025);}
+.sticker.dragging .sticker__body{transform:scale(1.035) rotate(-0.9deg);}
+.sticker.dragging .sticker__gloss{opacity:0.95;}
 /* ═══ THE PLATE — ONE PHOTOGRAPH, THREE SPOT INKS ══════════════════════════════════════════
    THE SAME 699×532 FILE, THREE TIMES, BLENDED `multiply`. A riso print is not a tinted photograph:
    it is separate drums of ink, each printing its own value, and every overlap darkens because the
@@ -521,49 +650,142 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
    The ink bleed itself is an SVG filter (sprite at the foot of the page): feTurbulence for a
    wobble field + feDisplacementMap to push the edge, with a wide filter region (x −18%, width 136%)
    so the displacement is not clipped at the box the way the default −10%/120% clips it. */
-.riso-portrait{position:absolute;right:0;bottom:0;height:80%;aspect-ratio:699/532;width:min(46vw,700px);z-index:1;will-change:transform;}
+/* THE PLATE SITS ON THE FOLD, NOT IN THE AIR ABOVE IT. It used to hang from `top:max(9rem,16vh)`,
+   which is a TOP anchor chosen to clear the folio on one particular laptop: on any other ratio the
+   plate floats — on a 1024x768 tablet it starts 144px down a 696px sheet and its foot lands 190px
+   above the board, so the photograph reads as a picture dropped onto the page rather than printed
+   into it. A broadsheet's plate is set from the BASELINE. `bottom:-1.5rem` puts its foot a hair past
+   the fold (the sheet's `overflow:hidden` crops it, which is the press bleed, deliberately) and the
+   height is driven by the SHORTER of 58vh and the width the sheet can spare — so a short laptop
+   shrinks the plate instead of pushing it up into the masthead, and a tall tablet grows it until it
+   meets the word. `top:auto` is what makes `bottom` the anchor at all. */
+.riso-portrait{position:absolute;right:0;top:auto;bottom:-1.5rem;height:min(58vh,calc(46vw * 532 / 699));width:auto;aspect-ratio:699/532;z-index:1;will-change:transform;}
 .riso-portrait:focus-visible{outline:2px solid var(--ink);outline-offset:5px;}
-.rp-layer{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;object-position:right bottom;mix-blend-mode:multiply;pointer-events:none;-webkit-user-select:none;user-select:none;}
-/* THE DRUMS ARE LIGHT, AND THAT IS THE WHOLE PRINT. Two saturated multiplies over the same pixel
-   can only end at black — which is what a 100%-coverage two-colour proof looks like, not a riso.
-   A real drum lays a TINT: a light, low-saturation ink that darkens what is under it by a third
-   instead of erasing it, so the overlap of the two colours is a readable third colour (violet,
-   olive, rust) and the KEY is the only plate that goes to black. `contrast(0.7)` on the drums
-   flattens them toward that tint; `contrast(1.6)` on the key is what keeps the drawing. */
-.rp-red{filter:url(#riso-ink-bleed) grayscale(1) sepia(1) saturate(3.4) hue-rotate(-26deg) brightness(1.22) contrast(0.74);opacity:0.94;}
-.rp-blue{filter:url(#riso-ink-bleed) grayscale(1) sepia(1) saturate(3.4) hue-rotate(174deg) brightness(1.18) contrast(0.72);opacity:0.9;}
-.rp-key{filter:url(#riso-ink-bleed) grayscale(1) contrast(1.62) brightness(0.62);}
-/* ═══ THE GEAR ═══════════════════════════════════════════════════════════════════════════════
-   A printer's gear, drawn as a stroked cog standing above the strip in the sheet's own ink. It is
-   the one ornament that MOVES: main.js rotates it continuously against scroll progress (and adds a
-   little velocity lean), because a cog on a broadsheet is a colophon, and a colophon turning is the
-   cheapest way to say the page is a machine rather than a poster. aria-hidden, unclickable. */
-.hero-gear-asterisk{position:absolute;right:var(--hero-pad);bottom:clamp(0.9rem,2.4vh,1.6rem);z-index:5;width:clamp(58px,7.5vw,104px);height:auto;pointer-events:none;color:var(--ink);opacity:0.9;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round;will-change:transform;}
+.rp-layer{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;object-position:right top;mix-blend-mode:multiply;pointer-events:none;-webkit-user-select:none;user-select:none;}
+/* FOUR PASSES, NOT THREE. The first is the sheet's own shadow: the same file, multiplied down to
+   black and pushed 10px right / 14px down at 24% — a solid cardstock cutout sitting under the
+   print, which is what makes the plate an object on the page instead of an image in it. It is a
+   silhouette by construction (`brightness(0)` keeps the alpha and throws the photograph away), so
+   it can never ghost a face; then red, then blue, then the key, in printing order. */
+.rp-shadow{filter:brightness(0) blur(11px);translate:10px 15px;opacity:0.2;}
+/* THE DRUMS ARE LIGHT, AND THE HIGHLIGHT IS THE PAPER. A riso drum prints a TINT: it holds no black,
+   only a chroma, so an unprinted highlight must leave the drum as WHITE — multiply by white is the
+   no-op that keeps the sheet, and a plate that cannot reach white prints its own pale yellow there.
+   That one rule decides the whole recipe. `sepia(1)` sends pure white to rgb(1, 1, 0.937): the blue
+   channel never arrives at 1, so the ink's own colour is warm at the very top of the scale, and
+   `saturate()` amplifies exactly that residual — which is how a white striped shirt came out olive
+   (#817511 measured, a 4.3:1 stain on the paper) instead of newsprint. Three things fix it, and all
+   three are what a press actually does:
+     · BRIGHTNESS AFTER SATURATE, AND ABOVE 1. Every highlight is pushed past 1 and clipped back to
+       white, so the drum lays nothing where the photograph has no density. The film base, in CSS.
+     · A SATURATION THE HUE ROTATION CAN SURVIVE. saturate(5.2) then hue-rotate(-18deg) drove the
+       highlight's blue down to 0.4 — rotation in RGB pushes a channel out of gamut — and no later
+       brightness can bring a crushed channel back. saturate(1.8) leaves enough blue for the clip.
+     · A KEY THAT LIFTS, NOT A KEY THAT CRUSHES. contrast(1.9) brightness(0.55) multiplied the whole
+       photograph down, so skin went to #050302: black, with no modelling left to hold ink. The key
+       now lifts (brightness 1.34) and takes only a little contrast, while the shirt clips to paper.
+   The drums carry different densities on purpose — 1.8 for the red, 3.2 for the blue — because
+   rotating toward blue keeps the highlight and rotating toward red is what costs it. Vermilion is
+   held at 68% and cobalt at 46%, so the two inks tint rather than cover, and the misregistration
+   reads as two coloured edges and not as a third colour in the middle.
+   MEASURED PER PIXEL ON THIS PLATE, over #EAE7E0 (riso-sim.mjs runs the browser's own matrices):
+     shirt   #e5e3d3  — 1.04:1 against the paper: the shirt IS the sheet, pinstripes inked
+     face    #908884  — lit skin in warm grey; cheek #3b3034 and brow #3c3136 keep the modelling
+     hair    #191516  and collar #877879 — the darks still take all three passes
+   NO SEPARATION TOOL ON THIS MACHINE (§06): there is no ImageMagick here, so the three passes are
+   derived from the one PNG in CSS, and the numbers above are what the CSS does to this file rather
+   than what a colour-managed RIP would do. The key takes the tone and the drums take the chroma —
+   which is the printing order as well as the safest division of labour. */
+/* the drum's own highlight is the sheet: brightness last, above 1, so white clips back to white.
+   `translate` is the MISREGISTRATION — a few pixels apart at rest, which is the only reason the two
+   inks can be seen at all: registered, a drum that is a tint is a drum nobody notices. It is the
+   individual `translate` property and not `transform`, because main.js writes that matrix. */
+.rp-red{filter:url(#riso-ink-bleed) grayscale(1) sepia(1) saturate(2.4) hue-rotate(-46deg) brightness(1.32);opacity:0.88;translate:-3px 2px;}
+.rp-blue{filter:url(#riso-ink-bleed) grayscale(1) sepia(1) saturate(3.2) hue-rotate(188deg) brightness(1.22) contrast(1.1);opacity:0.7;translate:4px -3px;}
+/* the key lifts the mids and keeps the darks: a plate you can read a face through, not a silhouette */
+.rp-key{filter:url(#riso-ink-bleed) grayscale(1) brightness(1.34) contrast(1.08);}
+/* ═══ THE ASTERISK (§06) ══════════════════════════════════════════════════════════════════════
+   THE COLOPHON IS A GLYPH, NOT A DRAWING — AND IT IS THE GRUNGE FACE'S GLYPH. It used to borrow the
+   masthead's blackletter `*`, which is the right idea in the wrong face: at 150px the blackletter
+   asterisk is a solid six-lobed smudge with almost no aperture, so it read as a blot rather than as a
+   mark, and its blackletter sidebearings made the box wider than the ink (which is what pushed it
+   under the portrait on a laptop). The grunge face's `*` is drawn — thin radiating strokes with real
+   white between them — so it survives being blown up 20x, it matches the folio's clock and volume
+   (both already grunge), and it prints as the same asterisk the board's `*` block wears.
+   The nudges are optical, not layout: 11.8vw with a 104–162 clamp holds the mark at the sheet's own
+   display scale from 1024 to 2560, and `translate:0 -0.08em` lifts it off the shared baseline so the
+   glyph's optical centre sits on the corner rather than its leading. BOTH are individual properties,
+   because `transform` on this node belongs to the ratchet below.
+   IT RATCHETS. Scroll is quantised to 15° steps (`round(scroll*0.12/15)*15` in main.js) and each
+   step is a short back.out turn with a 1px settle, so the mark reads as a mechanism indexing rather
+   than as a dial being dragged: nothing moves between steps, and there is no continuous rotation
+   for a still visitor to sit next to. The class stays `.hero-gear-asterisk` so the kill lists, the
+   harness and the sheet's own frame code keep addressing one node. aria-hidden, never hit. */
+.hero-gear-asterisk{position:absolute;right:var(--hero-pad);bottom:clamp(0.6rem,2vh,1.35rem);z-index:5;pointer-events:none;color:var(--ink);opacity:0.9;will-change:transform;}
+.hero-asterisk-mark{display:block;font-family:var(--serif-grunge);font-weight:400;font-size:clamp(104px,11.8vw,162px);line-height:1;letter-spacing:0;translate:0 -0.08em;}
 
-/* -- 06b CONTENTS STRIP (the signboard) -----------------
-   THE HANDOFF. This is the hero's exit and the bar's entrance: a sticky contents row that runs
-   its four names sideways, and hands the top 2.6rem to the fixed bar as it docks. main.js measures
-   ONE number — how far the strip has risen through its own height — and writes it twice: the
-   bar's opacity is p, the strip's type is 1 − p. At scrollY 0 the bar is not on the page at all;
-   when the strip reaches the top the type is gone and the bar is fully inked over it. Nothing in
-   this block animates that: both fades are per-frame values, so they cannot lag behind a scroll.
-   ITS HEIGHT IS A TOKEN (`--marquee-h`), not a measurement: the hero above subtracts the same
-   number, so the page's first fold is exactly viewport-minus-strip at every width.
-   THE SEAM. Two identical lists, the second aria-hidden with tabindex=-1 on its links, give the
-   -50% loop a clean seam with no script and no gap to drift on — the track's width is exactly
-   twice a list's. Hover and focus pause it: a moving target is not a click target.
-   The bar sits at z 510, one above this strip, because the bar is what the strip becomes. */
-.marquee-toc{position:sticky;top:0;z-index:500;display:flex;align-items:stretch;height:var(--marquee-h);overflow:hidden;color:var(--bone);background:rgba(20,16,12,0.9);border-top:var(--hairline) solid var(--rule-dark);border-bottom:var(--hairline) solid var(--rule-dark);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
-.marquee-track{display:flex;flex:0 0 auto;align-items:stretch;width:max-content;height:100%;animation:marquee 46s linear infinite;will-change:transform;}
-.marquee-set{display:flex;align-items:stretch;margin:0;padding:0;list-style:none;}
-.marquee-set li{display:flex;}
-.marquee-link{display:flex;align-items:center;gap:0.55rem;height:100%;padding:0 1.05rem;font-family:var(--mono);font-size:0.52rem;letter-spacing:0.19em;text-transform:uppercase;color:var(--muted-dark);text-decoration:none;white-space:nowrap;cursor:none;transition:color 0.2s ease;}
-.marquee-link:hover,.marquee-link:focus-visible{color:var(--bone);}
-.marquee-link:focus-visible{outline:1px solid var(--bone);outline-offset:-3px;}
-.marquee-n{color:var(--brass);font-size:0.92em;}
-.marquee-star{align-self:center;padding:0 0.62rem;font-size:0.62rem;color:var(--accent);}
-@keyframes marquee{from{transform:translate3d(0,0,0);}to{transform:translate3d(-50%,0,0);}}
-.marquee-toc:hover .marquee-track,.marquee-toc:focus-within .marquee-track{animation-play-state:paused;}
+/* ═══ SELECTION (§06) ═══════════════════════════════════════════════════════════════════════════
+   THE SHEET IS AN OBJECT; THE PROSE IS TEXT. A drag on the masthead is a drag — the sticker, the
+   plate, the folio — and `user-select:none` on exactly those surfaces is what stops the browser
+   guessing that you meant to highlight the name, which it will otherwise do and which turns every
+   peel into a smear of blue. The prose is the opposite: a reader has to be able to quote it, so the
+   same rules restore `text` on every body-content surface by name, so a `none` inherited from a
+   section wrapper can never quietly take the paragraphs with it.
+   `::selection` is the one place the ink is allowed to go loud: the vermilion is already one of the
+   four pop inks, and as a FIELD over bone (#FF4F38 on #EAE7E0) it is 2.65:1 — enough to see the
+   highlight, which is not a body colour and never has to carry a paragraph on its own.
+   THE TYPE INSIDE THE FIELD IS THE OTHER NUMBER, AND IT IS THE ONE THAT MATTERS. The first cut of
+   this rule kept the bone for the selected text, which measured 2.65:1 against the vermilion — a
+   quoted sentence the reader has just been told they are allowed to quote, printing itself at half
+   the contrast of the page around it. The sheet's own black on the same field is 5.79:1, so the ink
+   goes dark (--dark's value) and the highlight stays loud: the two roles are opposite, not shared.
+   `::selection` cannot carry a token the way a rule does — nothing reads it back through
+   getComputedStyle — so these two rules restate the hex and the number is written down here instead. */
+#hero,.hero__title,.name-line,.hero__folio,.folio-vol,.folio-date,.folio-clock,.hero-fold,
+.hero-gear-asterisk,.site-head,.metroboard,.metro-block,.page-progress,.section-title,.work-title,
+.mag-display,.metro-t,.metro-n{
+  -webkit-user-select:none;user-select:none;
+}
+p,li,.ledger-note,.log-entry,.reach-link,.fn-back,.who-text,.case-p,.dyk-text,.footnotes,.skills-line{
+  -webkit-user-select:text;user-select:text;
+}
+::selection{background:#FF4F38;color:#14100C;}
+::-moz-selection{background:#FF4F38;color:#14100C;}
+
+/* -- 06b METROBOARD (the contents) ----------------------
+   THE SHEET'S HANDOFF IS A BOARD, NOT A MARQUEE. Directly after #hero, in flow, four full-block
+   links: 01 WHO / 02 WORK / * AKCIDENTAL VISION / 03 GET IN TOUCH. It is the page's table of
+   contents drawn as a strip of printed blocks — the riso board that says "this is what there is"
+   before the reader scrolls into it.
+   THE INK IS THE DIVIDER. `gap:2px` over a #141110 field: the gaps ARE the rules, no borders and
+   no extra elements, and the block is exactly `--board-h` tall because #hero subtracts the same
+   token (§06). One viewport of sheet plus one board, to the pixel, at every width.
+   IT IS NOT STICKY — deliberately. The head already owns the top of the screen (§05) and a second
+   fixed band would eat the first 72px of every section below it, which is exactly the space the
+   prose needed. The board is a door you walk through once.
+   COLOUR IS THE MAP: each block carries its own --pop (--pop-1..4, the same four the head's row
+   uses), ink type on the pop field, and an INVERSION on hover/focus — #141110 field, pop-coloured
+   type — so the block you are about to press is the block that is lit. `aria-current` is written
+   by the same observer that feeds the head, so the board and the bar agree about where you are.
+   Below 640 it becomes 2x2 and `--board-h` is restated on :root, so the hero shortens with it and
+   the fold still ends on the board's last row. */
+.metroboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;height:var(--board-h);background:#141110;border-top:1px solid #141110;border-bottom:1px solid #141110;}
+.metro-block{display:flex;flex-direction:column;justify-content:center;gap:0.3rem;min-width:0;min-height:44px;padding:0.45rem 0.9rem;background:var(--pop);color:#141110;text-decoration:none;cursor:none;transition:background-color 0.2s ease,color 0.2s ease;}
+.metro-block:hover,
+.metro-block:focus-visible{background:#141110;color:var(--pop);}
+/* the press is 2px of travel, and it is `translate`, not `transform`: no layout, no reflow, and it
+   cannot fight anything else that might write a transform on a block later */
+.metro-block:active{translate:0 2px;}
+.metro-block:focus-visible{outline:2px solid var(--pop);outline-offset:-4px;}
+.metro-n{font-family:var(--mono);font-weight:700;font-size:0.6875rem;line-height:1;letter-spacing:0.16em;}
+.metro-t{font-family:var(--mono);font-weight:700;font-size:clamp(0.8rem,1.5vw,1.05rem);line-height:1.12;letter-spacing:0.02em;text-transform:uppercase;overflow-wrap:anywhere;}
+@media (max-width:639.98px){
+  /* the token lives on :root, where #hero reads it — restating it on .metroboard would shorten the
+     board and leave the sheet claiming a fold it no longer has */
+  :root{--board-h:130px;}
+  .metroboard{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .metro-block{min-height:64px;}
+}
 
 /* -- 07 WHO -------------------------------------------- */
 #who{background:var(--bone);color:var(--dark);padding:7rem var(--pad) 6rem;border-bottom:1px solid var(--rule);position:relative;}
@@ -664,7 +886,7 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
 .leaflet-open-btn:hover{background:var(--dark);color:var(--bone);}
 /* The spread itself is the door. It had no focusable child, so the object could only be opened
    by the labelled button under it — now the whole sheet is one real button (keyboard-reachable,
-   one hit area). UA button chrome is reset the same way .nav-bc and .art-return do it. */
+   one hit area). UA button chrome is reset the same way .skip-link and .art-return do it. */
 .leaflet-thumb{--lf-thumb-w:30rem;--lf-ratio:0.7066;--lf-card-w:min(var(--lf-thumb-w),calc(var(--onpage-cap,100vh) * var(--lf-ratio)));display:block;width:min(100%,var(--lf-card-w));max-width:100%;margin:0 auto;padding:0;border:0;border-radius:0;background:none;appearance:none;-webkit-appearance:none;font:inherit;color:inherit;text-align:inherit;cursor:none;}
 .leaflet-thumb:focus-visible{outline:2px solid var(--dark);outline-offset:10px;}
 .case-01 .case-foot{display:grid;grid-template-columns:1fr 1.55fr;gap:4rem;align-items:start;}
@@ -1067,11 +1289,11 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
      bleed is the only softness on it: the letterforms wick, the geometry does not. */
   .hero__title{filter:blur(0);transition-property:opacity,filter;transition-duration:0.5s,1.2s;transition-timing-function:ease,ease-out;}
   .hero__title:hover{filter:blur(0.28px);transition-duration:0.5s,0.9s;}
-  /* the bar's type — the breadcrumb and the list's rows. No `transform` in this list: the
-     menu's links are not magnetic any more, but a transform transition here would still make
-     the caret's rotation and the row states fight each other on open/close. */
-  :is(.nav-bc,.nav-menu-link){filter:blur(0);text-shadow:0 0 0 transparent;transition:filter 1.2s ease-out,text-shadow 1.4s ease-out;}
-  :is(.nav-bc,.nav-menu-link):hover{filter:blur(0.25px);text-shadow:0 0 0.4px currentColor;transition-duration:0.7s,0.9s;}
+  /* the head's type — the four places and the brand. No `transform` in this list: the ::before
+     square is scaled, and a transform transition here would make the square and the text fight
+     each other on hover. */
+  :is(.head-nav-link,.head-brand,.sound-toggle){filter:blur(0);text-shadow:0 0 0 transparent;transition:filter 1.2s ease-out,text-shadow 1.4s ease-out;}
+  :is(.head-nav-link,.head-brand,.sound-toggle):hover{filter:blur(0.25px);text-shadow:0 0 0.4px currentColor;transition-duration:0.7s,0.9s;}
 }
 
 /* -- 12d VISITOR LEDGER ------------------------------- */
@@ -1159,15 +1381,27 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
 }
 @media(max-width:800px){
   .hero__stage{max-width:100%;padding:0 0 2rem;}
-  #hero{padding-top:6rem;padding-left:1.5rem;--hero-pad:1.5rem;}
+  /* the folio is two rows on a phone (§06), so the sheet's clearance at the top is that line plus
+     air — a measured clamp now that the bar is not on the cover at all (§16), and expressed in
+     `svh` because the small viewport is the one that is true while the URL bar is showing */
+  #hero{padding-top:clamp(4.25rem,10svh,5.5rem);padding-left:1.5rem;--hero-pad:1.5rem;}
+  /* THE FOLIO, TWO ROWS: volume and clock share row 1 — the two facts a reader checks — and the
+     dateline is centred under them. "— SHARJAH, UAE" is dropped: the footer already prints the
+     city twice, and at 390px the words cost more than they say. */
+  .hero__folio{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"vol clock" "date date";row-gap:0.45rem;column-gap:0.8rem;align-items:center;}
+  .folio-vol{grid-area:vol;}
+  .folio-vol .folio-city{display:none;}
+  .folio-clock{grid-area:clock;justify-self:end;}
+  .folio-date{grid-area:date;justify-self:center;}
+  .folio-date .folio-rule{flex:1 1 1.2rem;min-width:0.8rem;}
   /* the sheet's plate becomes a second row on the phone: sized by width, so it can never push
      the page's scrollWidth past the gutter — the height follows the plate's own 699:532 ratio */
-  .riso-portrait{position:relative;right:auto;bottom:auto;height:auto;width:min(86vw,48vh);justify-self:end;align-self:end;}
-  /* the sticker is smaller here because the word is: a third of the letters, hung off the RIGHT end
-     of each row and above/below it, so the masthead stays readable at 390px while the plates still
-     read as peeled onto the sheet */
-  .sticker{left:74%;top:-28%;width:36%;}
-  .sticker--dalal{left:78%;top:26%;width:42%;}
+  .riso-portrait{position:relative;right:auto;top:auto;bottom:auto;height:auto;width:min(86vw,48vh);justify-self:end;align-self:end;}
+  /* THE PLATES ARE THE WORDS HERE TOO (§06). Same percentage of the same inline-block, so a
+     phone's sticker is smaller for exactly the reason the phone's word is — no second rule, no
+     second number, and the plate still covers its letters. */
+  .sticker--aliasgar{width:88%;}
+  .sticker--dalal{width:86%;}
   .who-body{grid-template-columns:1fr;gap:3rem;}
   .who-left{position:relative;top:auto;width:50%;}
   .case-01 .case-foot,.case-02 .camp-grid,.ops-grid{grid-template-columns:1fr;}
@@ -1175,7 +1409,18 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
      folds across the sheet instead of along it. The strip is deliberately taller than the
      room — the room scrolls and the controls stay where a thumb can reach them, which is
      the only honest way to show a 4-panel sheet on a 390px screen. */
-  .lf-modal{--lf-w:min(calc(100vw - 2 * var(--pad)),300px);padding-bottom:0;}
+  /* THE FOLD HAS TO FIT THE PHONE, NOT THE OTHER WAY ROUND. `--lf-w` used to be width-driven only, so
+     a tall narrow phone got a 300px sheet whose FIRST PANEL alone was 425px before any control — the
+     fold opened on a page you had to scroll to finish reading, which is the one thing a fold must
+     never do. One panel is `--lf-w × (2604/460) / 4`, i.e. ×1.415, so the width is now capped by the
+     height that is actually left after the controls (16rem of buttons, pager, state and padding):
+     solve 1.415w ≤ 100svh − 16rem and the `460/651` term below is the answer, derived rather than
+     tuned. `svh`, not `vh`: the small viewport is the one that is true while the URL bar is showing. */
+  .lf-modal{--lf-w:min(calc(100vw - 2 * var(--pad)),calc((100svh - 16rem) * 460 / 651),300px);padding-bottom:0;}
+  /* Every control in the fold is a thumb target, and every one of them was under 44 before this. */
+  .lf-modal-close{display:grid;place-items:center;min-width:44px;min-height:44px;
+    right:max(0.6rem,env(safe-area-inset-right));top:max(0.6rem,env(safe-area-inset-top));}
+  .lf-mbtn{min-height:44px;}
   .lf-rig{aspect-ratio:460/2604;}
   .lf-book-container{margin-top:0.6rem;}
   .lf-modal-controls{position:sticky;bottom:0;gap:0.6rem;margin-top:1.6rem;
@@ -1256,9 +1501,8 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
   .art-return{min-height:44px;}
   .lf-mbtn{min-height:44px;}
   .art-close{display:grid;place-items:center;min-width:44px;min-height:44px;}
-  /* the toggle's box is 11px of ring: the target is the ::after, widened from -0.9rem
-     (41.6px tall) to -1rem (45.0px) — a hit box only, nothing moves in the layout */
-  .sound-toggle::after{inset:-1rem;}
+  /* the wave's label is a word, so the target is the button's own box: no ::after widening is
+     needed, and none is declared (there is no ::after on .sound-toggle any more) */
 }
 @media(min-width:768px) and (max-width:800px){
   /* B. the 800 block laid a phone's shapes on a tablet's page. Every rule below restates the
@@ -1266,10 +1510,10 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
      measure, the same row, the same hairline. Scoped to the same 800 the phone block and
      main.js's lfNarrowMQ use, so no width belongs to one and not the other. */
   #hero{padding-left:var(--pad);--hero-pad:var(--pad);}
-  /* the photo stays in the flow — an absolute 80% plate needs a wide column to sit behind —
-     but it is a band on a tablet, not the phone's share of the screen. Height wins here, so the
-     plate's own ratio supplies the width again. */
-  .riso-portrait{height:clamp(280px,36vh,420px);width:auto;}
+  /* the photo stays in the flow — an absolute plate needs a wide column to sit behind — but it is
+     a band on a tablet, not the phone's share of the screen. Height wins here, so the plate's own
+     ratio supplies the width again, and `top:auto` keeps it out of the new absolute anchor (§06). */
+  .riso-portrait{position:relative;top:auto;bottom:auto;height:clamp(280px,36vh,420px);width:auto;}
   /* the portrait beside the text again: the desktop's 33/67 split, sticky as it is above
      1100, with a gutter that narrows with the sheet instead of the desktop's fixed 6vw */
   .who-body{grid-template-columns:minmax(0,33fr) minmax(0,67fr);gap:5vw;}
@@ -1329,14 +1573,14 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
   /* §06 — THE HERO IS THE SHEET. Same three tracks as every other band (--frame-cols), zero
      padding, and the portrait spans into the outer track so it bleeds to the monitor's edge —
      a grid track resolves against the client box, so this is scrollbar-exact with no 100vw. The
-     sheet is exactly one screen tall here, which is what makes the contents strip's dock land
-     predictably on the fold. Below 1200 none of this applies: the hero keeps its own padding and
-     the portrait keeps its absolute corner. */
-  #hero{grid-template-columns:var(--frame-cols);padding-left:0;--hero-pad:var(--gutter);height:calc(100vh - var(--marquee-h));min-height:0;align-items:center;}
+     sheet is exactly one screen minus the board, which is what puts the board on the fold. */
+  #hero{grid-template-columns:var(--frame-cols);padding-left:0;--hero-pad:var(--gutter);height:calc(100vh - var(--board-h));min-height:0;align-items:center;}
   /* both items name ROW 1 as well as their columns: auto-placement would put the portrait on a
-     row of its own (it overlaps .hero__stage's track), and a second row would split the sheet. */
+     row of its own (it overlaps .hero__stage's track), and a second row would split the sheet.
+     The plate is back in the grid at this width, so `top:auto` is what hands it back: the
+     absolute anchor (§06) is for the single-column sheet below 1200 only. */
   .hero__stage{grid-column:2;grid-row:1;max-width:54%;}
-  .riso-portrait{position:relative;right:auto;bottom:auto;grid-column:2/4;grid-row:1;justify-self:end;align-self:end;height:84%;width:min(44vw,660px);}
+  .riso-portrait{position:relative;right:auto;top:auto;bottom:auto;grid-column:2/4;grid-row:1;justify-self:end;align-self:end;height:84%;width:min(44vw,660px);}
   #who{padding-inline:var(--gutter);}
   #reach{padding-inline:var(--gutter);}
   .footer{padding-inline:var(--gutter);}
@@ -1513,15 +1757,16 @@ body{background:var(--bone);color:var(--dark);font-family:var(--eb);overflow-x:h
   /* the drawer takes the whole sheet: a 23rem panel on a 390px phone would be a 374px panel
      with a 16px sliver of page nobody can use */
   .set-drawer{width:100%;}
-  .nav-menu{min-width:0;width:calc(100vw - 2 * var(--pad));}
 }
 @media (pointer: coarse){
 body, a, button, input, textarea, .dt-wrap, .bingo-wrap, .reach-link, .art-return { cursor: auto !important; }
   #cur { display: none !important; }
 }
-/* THE SLUG IS GONE FROM §06, SO ITS NARROW-PHONE OVERRIDE GOES WITH IT. The masthead re-fits
-   itself (fitName), the sticker is a percentage of its word, and the gear is clamped in vw — none
-   of the three needs a 520px rule, and the sheet no longer has a caption line to truncate. */
+/* THE NETLIFY BADGE (§08, STOPGAP). The deploy inserts a fixed badge in the bottom-right corner;
+   it is not part of the sheet, and on a phone it lands on the board's last block. Hidden by the
+   two selectors the badge has used for years (an anchor whose aria-label names Netlify, and the
+   class the snippet carries) — a one-line stopgap until the badge is switched off at source. */
+a[aria-label*="Netlify"],.netlify-badge{display:none!important;}
 
 /* -- 14 PREFERENCE SWITCHES (runtime, not media) -------------------------
    Two attributes on <html>, written by the settings drawer in main.js and read here. They are
@@ -1569,14 +1814,343 @@ html[data-motion="off"] .mask-inner{transition:none !important;transform:none;}
    a sheet that keeps moving because the script got there first. `transform:none` is the same end
    state the rAF writes on its own when stillMotion() is true — this is the belt to that braces, and
    it lands even if the script never ran. */
+html[data-motion="off"] #hero,
 html[data-motion="off"] #hero [data-parallax-speed],
-html[data-motion="off"] #hero [data-skew],
 html[data-motion="off"] .hero-gear-asterisk,
 html[data-motion="off"] .rp-layer{transform:none !important;}
-/* §06b — the signboard stops travelling, and a line that never got its tween is still a line:
-   the reveal's end state is `none`, so writing it here is the same frame the tween would end on. */
-html[data-motion="off"] .marquee-track{animation:none !important;}
+/* §06d — THE WAVE IS HELD, NOT WAVING: five bars at their mid-height, which is the same instrument
+   with the motion taken out. §06b's marquee is gone, so its animation kill went with it; the
+   metroboard has nothing to kill because nothing there moves. */
+html[data-motion="off"] .sound-wave .wv{transform:scaleY(0.5) !important;}
 html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
+
+/* -- 16 THE GATE (cover / index / view) -----------------
+   THREE STATES, ONE ATTRIBUTE. `html[data-mode]` is written by ONE module in main.js (§16) and
+   the stylesheet says what each state looks like; nothing below is a class a second module could
+   toggle, so there is exactly one writer and one reader.
+   THE DEFAULT IS THE COVER, AND IT IS ALSO THE NO-SCRIPT PAGE. No `data-mode` means the gate is
+   a plain block holding the sheet and the board — the fold — with the head and the skip link
+   where they have always been. Every override below is scoped to `data-mode`, so a visitor whose
+   script never ran gets the cover and the whole broadsheet stacked underneath it, which is the
+   honest fallback: content first, choreography only where there is a script to perform it.
+   THE THREE STATES:
+     cover  the fold, and nothing else. The head is GONE (a nav bar on a poster is a leak) and the
+            skip link with it; the board is the only exit and it sits where it always sat. The
+            document ends on the board's last pixel, because the broadsheet is `hidden`.
+     index  the reader is scrubbing the gate: the sheet is pinned and the four inks rise behind it
+            as `--gate-p` runs 0 → 1 over the gate's own travel, with the four panels laid over
+            the flood at the end of it. The head is still gone: you are inside the contents page,
+            not the site.
+     view   a place was CHOSEN — by a block, a panel, or a deep link — and never scrolled to. The
+            gate is not rendered, exactly one section is, and the head is back over it at
+            `--head-h`.
+   THE GATE IS EXACTLY ONE SCREEN, AND THE MODULE OWNS THE TRANSITION. `.gate` and `.gate-stage`
+   are both `100svh`: there is no scroll travel inside the gate at all — `window.scrollY` is 0 in
+   the cover and in the index — so the fold cannot end up half-open because a reader stopped
+   scrolling. The module keeps its own progress (0 = cover, 1 = index) and tweens it with GSAP
+   over 0.85s (0.7s on a phone); the stylesheet only says what the two ends look like. That is why
+   `overscroll-behavior:none` is declared for the gate's two states: a wheel at the fold has
+   nowhere to chain to, so the intent layer is free to read it as a decision.
+   THE STAGE IS STILL A REAL BOX. `.gate-stage` is `position:relative`, not sticky, so it remains
+   the panels container's `offsetParent` exactly as before, and `overflow:clip` still clips the
+   sheet to the fold — the morph's coordinate space, the board's floor and the sheet's
+   `max-height` are all unchanged by the gate shrinking.
+   NO STICKY ANCESTOR MAY SCROLL-CLIP. Now that nothing is sticky this no longer decides whether
+   the index works, but the rule is kept: the gate still declares no `overflow`, and the stage
+   itself carries `overflow:clip`, which clips without creating a scroll container.
+   THE HARD STOP IS A HEIGHT, NOT A SCROLL GUARD. In the cover and the index the four
+   `[data-view]` sections and the footer are COLLAPSED to `height:0` and clipped, so the document
+   physically ENDS on the gate's last pixel: there is nothing below the contents to scroll into and
+   no handler is fighting the reader. `view` then hides the gate and lets exactly one section take
+   its own height again, so the same rule works in the other direction.
+   WHY `height:0` AND NOT `display:none`. The broadsheet is also the thing every measurement on this
+   page is taken from — the frame's tracks, the measure, the bleeds, the wall — and `display:none`
+   destroys all of it, which would make the layout of a section depend on whether you happened to be
+   looking at it. A collapsed, clipped box keeps every rect real and every computed style true while
+   contributing nothing to the document's height, so a section can be measured without being
+   entered. What it does NOT do is make the content reachable: the clip takes it out of hit-testing,
+   and `inert` (written by the module) takes it out of the tab ring and the accessibility tree, so a
+   keyboard and a screen reader are offered exactly the one place the reader is in. */
+.gate{position:relative;height:100vh;height:100svh;background:#141110;}
+.gate-stage{position:relative;height:100%;overflow:clip;}
+/* §16d — NO DEAD SCROLL AT THE FOLD. In the gate's two states the document is exactly one screen,
+   so a wheel or a rubber-band drag at its edge has nothing to scroll; `overscroll-behavior:none`
+   is what stops the browser's own overscroll animation from being mistaken for the gate beginning
+   to move and then springing back. A view is exempt — that is a real document that scrolls. */
+html[data-mode="cover"],
+html[data-mode="index"]{overscroll-behavior:none;}
+/* THE SHEET IS EXACTLY ONE SCREEN INSIDE THE STAGE. `min-height` alone would let a tall poster push
+   the board past the stage's bottom edge, where `overflow:clip` would cut the only exit off the
+   cover; `max-height` is what makes the sheet a sheet — one screen, no more — at every width, the
+   same contract 1200+ has always had as a fixed `height`. The board is therefore always the fold's
+   floor, which is what 9b and 9d read. */
+#hero{max-height:calc(100svh - var(--board-h));}
+/* the state's own hard stop: the gate leaves the document when a place does */
+#gate[hidden]{display:none !important;}
+
+/* ── INDEX: the stage is already the pin; the ink is all that changes ── */
+html[data-mode="index"] .gate-stage{z-index:1;}
+
+/* ── VIEW: the fold goes, and ONE section is the page ──
+   `display:none` on the gate rather than a zero height: the gate is the only ancestor of the
+   stage and of the three surfaces the morph measures, and a box collapsed to zero would leave
+   every rect inside it real but meaningless — the panels' quarters would measure against a
+   container with no height. In a view the gate is not "scrolled past", it is not there. */
+html[data-mode="view"] .gate{display:none;}
+/* ── THE BROADSHEET IS FOLDED AWAY IN THE GATE'S TWO STATES ──
+   ONE wrapper, collapsed to zero. It is a wrapper rather than four `height:0`s for a reason the
+   box model does not let us dodge: a section carries 13rem of block padding, and under
+   `border-box` a border box can never be shorter than its padding — `height:0` on `#who` measures
+   209px, not 0. A wrapper with no padding, no border and no margin collapses exactly, while every
+   rect inside it stays real, so the layout of a section does not depend on whether the reader has
+   opened it. The block itself is not painted (`overflow:clip`) and cannot be hit-tested, and the
+   module's `inert` takes the whole subtree out of the tab ring and the accessibility tree.
+   The footer needs the same treatment by hand — it is body's child, not the wrapper's — and its
+   own padding, top margin and hairline are zeroed because each of them would put pixels back. */
+html[data-mode="cover"] #broadsheet,
+html[data-mode="index"] #broadsheet{height:0;overflow:clip;pointer-events:none;}
+html[data-mode="cover"] .footer,
+html[data-mode="index"] .footer{height:0;padding-block:0;margin-top:0;border-top-width:0;
+  overflow:clip;pointer-events:none;}
+/* IN A VIEW THE FOLD GOES, AND THE FOUR SECTIONS ARE THE DOCUMENT AGAIN — except the three the
+   reader is not in. `inert` is the module's word for "not the current place", so the stylesheet
+   keys off the same attribute: one word, written once, read by the renderer, the tab ring and the
+   accessibility tree alike. */
+html[data-mode="view"] #broadsheet > [data-view][inert]{display:none;}
+
+/* ── WHERE A VIEW STARTS ──
+   A view is opened by routing to `#who` and scrolling it to the top of the document, which puts
+   its first line UNDER the fixed head unless the section itself reserves the bar. This is that
+   reservation, and it is stated once for every place: `--head-h` plus a clamp of air. It is
+   scoped to `view` because the no-script page stacks the sections in normal flow, where each
+   section's own block padding is already the rhythm. Deliberately NOT duplicated as a
+   `scroll-padding-top` on the scroller: `#who`/`#work`/`#reach`/`#magazine` already carry a
+   `scroll-margin-top`, and the two would ADD, dropping every fragment jump a hundred pixels too far
+   down the page. */
+html[data-mode="view"] [data-view]{padding-top:calc(var(--head-h) + clamp(1.5rem,3vh,2.5rem));}
+
+/* ── THE HEAD, AND THE WAY PAST IT ──
+   `visibility`, NOT `display`. Both take the bar out of the tab ring and out of the accessibility
+   tree, but only `visibility` leaves the box laid out — and a bar that is not laid out cannot be
+   measured. The fixed row is `--head-h` tall in every state (the suite reads that, and so does
+   anything else that needs to know where the page starts under it), and a `display:none` subtree
+   also makes Chrome report `transform:none` for the sound mark inside it, which is a lie about a
+   rule the stylesheet is still applying. So the bar is INVISIBLE in the two states that have no
+   page under them, not absent. */
+html[data-mode="cover"] .site-head,
+html[data-mode="index"] .site-head{visibility:hidden;pointer-events:none;}
+/* the skip link is the way past a bar that is not there: hide the answer with the question */
+html[data-mode="cover"] .skip-link,
+html[data-mode="index"] .skip-link{display:none;}
+
+/* ── THE BOARD BECOMES THE CONTENTS ──
+   The index used to grow four inks behind the pinned sheet and then fade four cards in over them,
+   which is a crossfade between two objects that were never the same thing. It now does what a
+   contents page should: the strip of blocks at the fold ENLARGES INTO the four panels — the block's
+   own rectangle travelling to its own quarter of the screen, one door per place — and the ink the
+   block already wore IS the plate's ground, so nothing has to be bleached on the way: the block is
+   a small `--pop` block, the plate is a large `--pop` plate, and the journey between them changes
+   size and nothing else. One object, one journey.
+   THE PANELS ARE PRINTED PLATES, NOT CARDS. Three layers, one per job: `::before` is the halftone
+   tooth (8%, multiply, no events), the plate's own background is the block's `--pop` AT FULL
+   COLOUR, `.ip-inner` is the type and `.ip-frame` is the key line. The index is the page the four
+   inks were always promising, so it RESTS IN COLOUR exactly as the board does, and inverts to the
+   sheet's dark ground under the pointer — the same one-gesture answer the board gives, so a reader
+   who has learned the cover already knows the contents.
+   THE INVERSE IS THE POINT. The module scales the plate from the block's rect to its own quarter and
+   writes `1 / that` on `.ip-inner`, so the cumulative scale on the type is exactly 1 on every frame
+   of the morph: the box grows, the words never stretch. SM.2/SM.4 measure both halves of that.
+   WHAT ANIMATES, AND WHAT MUST NOT. Only `background-color`, `color` and `translate`. `filter` would
+   repaint the tooth and the type on every frame of a hover, and a width or a height would relayout
+   the grid under the pointer; those three are compositor work, and 0.18s is a cut rather than a
+   fade — printed ink changes when it is touched. */
+/* THE FOLD IS AN ATTRIBUTE OF THE MORPH, NOT OF THE MODE (§16d). It used to be scoped to
+   `html[data-mode="index"]`, which meant the docked bar vanished on the frame the state changed —
+   including on the way BACK, where the bar must stay folded until the morph has actually closed.
+   The module writes `data-fold` from its own progress (folded from 0.30 up, docked below it), so
+   this rule must not second-guess it from the mode attribute. */
+.metroboard[data-fold]{visibility:hidden;pointer-events:none;}
+/* the board is the exit from the index, so it has to stay above the sheet it is docked to — same
+   node, same four blocks, one stacking order higher than the stage */
+.metroboard{position:relative;z-index:6;}
+
+/* ── THE FOUR PANELS ──
+   The end of the index: the same four places at reading size, tiled 2x2 over the WHOLE stage with
+   no gutter, because the two `.ip-seam` hairlines are the register marks between them and a `gap`
+   could not draw itself from the centre out. `visibility`, never `display` and never `opacity` on
+   the container: the plates are measured (`offsetWidth`) while they are hidden, and a `display:none`
+   subtree measures zero. They sit at z 7, above the board's 6, so at `p` 1 there is one bottom bar
+   on screen and it is not the docked one. */
+.index-panels{position:absolute;inset:0;z-index:7;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:0;visibility:hidden;pointer-events:none;}
+.index-panel{position:relative;display:block;min-width:0;min-height:44px;overflow:hidden;background:var(--pop);color:#141110;--ink:#141110;text-decoration:none;cursor:none;transform-origin:0 0;-webkit-tap-highlight-color:transparent;transition:background-color .18s cubic-bezier(.33,0,.67,1),color .18s cubic-bezier(.33,0,.67,1),translate .18s cubic-bezier(.33,0,.67,1);}
+/* 0 — THE TOOTH. A 3px dot screen at 8% multiply: the plate reads as stock, never as flat ink. */
+.index-panel::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0.08;mix-blend-mode:multiply;background-image:radial-gradient(circle,#000 0.5px,transparent 0.6px);background-size:3px 3px;}
+/* 1 — THE INVERSE. At rest the plate is the block's own `--pop` at full strength, with the sheet's
+   dark ink on it: the board, enlarged. Under the pointer — or under a keyboard's focus ring — the
+   two swap, so the plate becomes a window cut in the dark ground with the bone type in it, and it
+   lifts 2px to say the press is live. There is no separate ink LAYER any more: a background is one
+   paint, and an `::after` whose opacity a script has to keep in sync is one more number that can be
+   wrong on a frame. */
+.index-panel:hover,
+.index-panel:focus-visible{background:#141110;color:#EAE7E0;translate:0 -2px;}
+.index-panel:focus-visible{outline:2px solid #EAE7E0;outline-offset:-4px;}
+
+/* 2 — THE TYPE. `transform-origin: 0 0` on the plate AND on this box is what makes the inverse a
+   single multiplication instead of a guess, and `grid-template-rows: auto 1fr auto` is the editorial
+   rhythm: the folio at the top, the title block on the optical centre, the way in at the foot. */
+.ip-inner{position:absolute;inset:0;z-index:2;display:grid;grid-template-rows:auto 1fr auto;transform-origin:0 0;will-change:transform;padding:clamp(1.5rem,3.2vw,3.25rem);}
+.ip-top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;min-width:0;}
+/* the number is the sheet's own grunge face; the folio mark keeps the blackletter, and NOTHING ELSE
+   in these plates does — a contents page has to be read, and a blackletter title is not read */
+.ip-num{font-family:var(--serif-grunge);font-weight:400;font-size:clamp(1.6rem,2.6vw,2.6rem);line-height:0.9;letter-spacing:0.02em;}
+.ip-folio{font-family:var(--serif-gothic);font-size:clamp(1.15rem,1.7vw,1.8rem);line-height:1;opacity:0.85;}
+.ip-body{align-self:center;display:flex;flex-direction:column;gap:clamp(0.5rem,1.1vh,1rem);min-width:0;padding-block:clamp(0.3rem,1.4vh,1.2rem);}
+.ip-t{display:block;font-family:var(--serif);font-weight:700;font-size:clamp(2.75rem,6vw,6.25rem);line-height:0.94;letter-spacing:-0.022em;overflow-wrap:anywhere;}
+.ip-teaser{display:block;font-family:var(--serif);font-size:clamp(1.05rem,1.3vw,1.35rem);line-height:1.38;max-width:34ch;opacity:0.82;}
+.ip-meta{display:flex;align-items:center;justify-content:space-between;gap:1rem;font-family:var(--mono);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;}
+/* THE ARROW IS DRAWN, NOT TYPED (§16) — the same mask idiom the way back already uses, so the mark
+   is a shape in `currentColor` and can travel on hover without a second colour to keep in sync. */
+.ip-arrow{flex:none;width:0.78rem;height:0.78rem;background:currentColor;transition:translate 0.24s ease;
+  -webkit-mask:var(--arrow-right) center/contain no-repeat;mask:var(--arrow-right) center/contain no-repeat;}
+.index-panel:hover .ip-arrow,
+.index-panel:focus-visible .ip-arrow{translate:0.22rem 0;}
+/* 3 — THE KEY LINE, drawn over the tooth and the ink alike, so a plate always has an edge even when
+   its own ground and the ink behind it are the same value */
+.ip-frame{position:absolute;inset:0;z-index:3;border:1px solid currentColor;opacity:0;pointer-events:none;transition:border-color .18s cubic-bezier(.33,0,.67,1);}
+/* the register marks BETWEEN the plates: absolutely placed, so they cost the grid no cell */
+.ip-seam{position:absolute;z-index:3;pointer-events:none;background:#141110;}
+.ip-seam-v{left:50%;top:0;bottom:0;width:1px;margin-left:-0.5px;transform:scaleY(0);}
+.ip-seam-h{top:50%;left:0;right:0;height:1px;margin-top:-0.5px;transform:scaleX(0);}
+/* ── FOUR BANDS ON A PHONE, NOT A 2x2 ──
+   A 2x2 of reading-size plates at 390 gives each cell ~185x320: too narrow for the sentence and too
+   tall for the title, and the reader has to hunt across a grid for the place they want. One band per
+   place — the number on the left, the title, one line of the work and the way in stacked on the
+   right — reads like the four storeys of a contents page, and each band is exactly a quarter of the
+   fold, so the four of them ARE the fold and a collapsing URL bar cannot clip the last one. The
+   seams go: at this size the frame draws every band edge by itself. */
+@media (max-width:767.98px){
+  .index-panels{grid-template-columns:1fr;grid-template-rows:repeat(4,25svh);}
+  .ip-seam{display:none;}
+  .ip-inner{grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-content:center;align-items:center;column-gap:1rem;row-gap:0.2rem;padding:0.9rem 1.25rem;}
+  .ip-top{grid-column:1;grid-row:1 / span 2;flex-direction:column;align-items:flex-start;gap:0.15rem;}
+  .ip-num{font-size:clamp(2rem,8vw,3.5rem);}
+  .ip-folio{font-size:0.85rem;}
+  .ip-body{grid-column:2;grid-row:1;gap:0.2rem;padding-block:0;}
+  .ip-t{font-size:clamp(1.85rem,7vw,3.1rem);}
+  .ip-teaser{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden;font-size:0.95rem;line-height:1.3;}
+  .ip-meta{grid-column:2;grid-row:2;font-size:0.55rem;}
+}
+
+/* ── THE WAY BACK, AT THE FOOT OF EVERY SECTION ──
+   One button, last in each section's flow, drawn in the section's own ink so it belongs to the
+   sheet it ends rather than to the chrome. It is a <button>, not a link: it changes a state, it
+   does not navigate to a document. 44px minimum on both axes because a thumb has to find it. */
+.back-index{grid-column:1/-1;display:flex;align-items:center;gap:0.7rem;justify-self:center;margin:clamp(3rem,6vw,5rem) auto 0;padding:0.95rem 1.5rem;min-height:44px;background:none;border:1px solid currentColor;border-radius:0;color:inherit;font-family:var(--mono);font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;appearance:none;-webkit-appearance:none;cursor:none;}
+/* THE ARROW IS DRAWN, NOT TYPED (§16) — see `--arrow-up` on :root. A mask of a 12x12 SVG filled
+   with `currentColor`, so the hover rule below recolours arrow and words together. */
+.back-index::before{content:"";flex:none;width:0.72rem;height:0.72rem;background:currentColor;
+  -webkit-mask:var(--arrow-up) center/contain no-repeat;mask:var(--arrow-up) center/contain no-repeat;}
+.back-index:hover,.back-index:focus-visible{outline:none;background:var(--dark);color:var(--bone);border-color:var(--dark);}
+#reach .back-index:hover,#reach .back-index:focus-visible{background:var(--bone);color:var(--dark);border-color:var(--bone);}
+.back-index:focus-visible{outline:2px solid currentColor;outline-offset:3px;}
+
+/* ── THE PULL-UP (§16) — A DRAWER, NOT A TOOLTIP ──
+   PHONES GET A SECOND DOOR, BECAUSE THEY HAVE NO ESCAPE KEY. It used to be a pill that faded in at
+   the foot of a view; a pill tells you a gesture exists but shows you nothing of where it goes, and
+   the door it opens is the contents page — four places in four inks. So the hint IS the index: a
+   drawer pinned under the view, its lip a strip of the same four inks the flood and the board use,
+   and its one line of type saying what the gesture will do. It rises with the thumb (`--pull`,
+   written by the module from the drag's own distance) and it never takes a press —
+   `pointer-events:none`, `aria-hidden="true"`, because it is an instruction and not a control.
+   `data-live` switches the transition OFF while a finger is on the glass: a drawer that eases
+   toward the thumb reads as lag, and one that follows it reads as paper. `data-prompt` swaps the
+   line at the halfway point, so the words have already said "release" before the door opens. */
+.pull-peek{position:fixed;left:0;right:0;bottom:0;z-index:520;display:none;flex-direction:column;
+  background:#141110;color:var(--bone);pointer-events:none;opacity:0;
+  transform:translate3d(0,calc(100% - 2.4rem),0);
+  transition:transform 0.34s cubic-bezier(0.16,1,0.3,1),opacity 0.26s ease;}
+.pull-peek[data-armed]{opacity:0.94;}
+.pull-peek[data-live]{opacity:1;transition:none;
+  transform:translate3d(0,calc(100% - var(--pull,0) * 100%),0);}
+/* THE LIP — the four inks, in the order the board prints them, at the thickness of the block's own
+   edge stripe. It is the one thing visible before the drawer has moved at all. */
+.pull-peek-bands{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;height:6px;flex:none;}
+.pull-peek-bands i{display:block;background:var(--pop);}
+.pull-peek-bands i:nth-child(1){--pop:var(--pop-1);}
+.pull-peek-bands i:nth-child(2){--pop:var(--pop-2);}
+.pull-peek-bands i:nth-child(3){--pop:var(--pop-3);}
+.pull-peek-bands i:nth-child(4){--pop:var(--pop-4);}
+.pull-peek-prompt{display:flex;align-items:center;justify-content:center;gap:0.5rem;
+  padding:0.8rem 1rem 1rem;font-family:var(--mono);font-size:0.56rem;letter-spacing:0.2em;
+  text-transform:uppercase;background:linear-gradient(to top,#141110,rgba(20,17,16,0.82));}
+.pull-peek-arrow{flex:none;width:0.78rem;height:0.78rem;background:currentColor;
+  -webkit-mask:var(--arrow-up) center/contain no-repeat;mask:var(--arrow-up) center/contain no-repeat;}
+.pull-peek-armed{display:none;}
+.pull-peek[data-prompt="armed"] .pull-peek-rest{display:none;}
+.pull-peek[data-prompt="armed"] .pull-peek-armed{display:inline;}
+html[data-mode="view"] .pull-peek{display:flex;}
+/* the gesture is a phone's; a pointer that can hover has a keyboard and an Escape key */
+@media (min-width:1025px){html[data-mode="view"] .pull-peek{display:none;}}
+
+/* ── THE HEAD'S WAY BACK TO THE INDEX ──
+   The first control in the head's action zone, because the name on the left already means the
+   cover and a second home link beside it would say the same thing twice. Mono at the 11px label
+   floor, a 44px hit box on the vertical axis, and a drawn arrow rather than a glyph so it reads
+   at the same weight as the words beside it. */
+.head-index{display:inline-flex;align-items:center;gap:0.4rem;min-height:44px;padding:0 0.15rem;background:none;border:0;border-radius:0;font-family:var(--mono);font-size:0.6875rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink);cursor:none;appearance:none;-webkit-appearance:none;}
+.head-index::before{content:"";flex:none;width:0.8rem;height:0.8rem;background:currentColor;
+  -webkit-mask:var(--arrow-left) center/contain no-repeat;mask:var(--arrow-left) center/contain no-repeat;}
+.head-index:hover{color:var(--brass);}
+.head-index:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
+/* THE PHONE HAS TWO ZONES, NOT THREE. At 390 the four-place row is not drawn, so the bar's middle
+   track has nothing in it — and `grid-template-columns:1fr auto 1fr` then auto-places the actions
+   into that EMPTY middle track while the brand overflows its own 1fr, which printed the name across
+   the sound mark. Two columns, the brand capped to its track, and `← INDEX` gone: the thumb's ways
+   back are the pull-up drawer at the foot of a view and BACK TO INDEX at the end of every section,
+   so the third control was the one that had to go. */
+@media (max-width:639.98px){
+  .head-bar{grid-template-columns:minmax(0,1fr) auto;}
+  .head-brand{max-width:100%;}
+  .head-index{display:none;}
+}
+
+/* ── THE FLOOD ──
+   The wash that carries one state into the next. Fixed, full-viewport, one plane, driven entirely
+   by `transform: scaleY()` so a route change never paints a frame of the page it is leaving. It
+   sits above the head (510) and the pull-up (520) and below the reticle (9999), so the mark stays
+   the top layer while the ink crosses everything else. `--flood` is the source block's own
+   `--pop`, written by the module; the default is the sheet's ink so a route with no colour is
+   still a flood and never a flash of unset. */
+#flood{position:fixed;inset:0;z-index:640;pointer-events:none;background:var(--flood,#141110);transform:scaleY(0);transform-origin:50% 100%;will-change:transform;}
+/* ── THE FLOOD'S DESTINATION (§16) ──
+   A flood that starts as a scaled sliver of a full-screen plane has no ORIGIN: it knows where it
+   ends and nothing about what it came from, so a press on the magazine's block and a press on the
+   head's row produced the same wash. The proxy is the other end of that sentence — a real, fixed,
+   full-viewport box with no paint of its own — and the module Flip-fits #flood from the pressed
+   block's rect to THIS element's bounds. The ink therefore leaves the thing you pressed, which is
+   what makes the block read as a door and not as a link that happens to change the page.
+   It is `visibility:hidden` rather than `display:none` because Flip has to measure it, and it takes
+   no events and paints nothing of its own, so a page that never floods never notices it. */
+#floodProxy{position:fixed;inset:0;z-index:641;pointer-events:none;visibility:hidden;transform-origin:50% 50%;}
+
+/* ── THE SECTION RESET, DECLARED ONCE ──
+   `[hidden]` alone does not hide these: `#work` and `#magazine` are `display:grid` and an id
+   beats an attribute selector. This is the one line that puts the UA rule back on top, and it is
+   scoped to `[data-view]` so nothing else in the sheet inherits a surprise. It is also why the
+   static HTML never carries `hidden` on a section: with no script there is no state to be in. */
+[data-view][hidden]{display:none !important;}
+
+/* §16d UNDER MOTION OFF THE INDEX IS A PAGE, NOT A TWIST. There is no morph to interpolate: the
+   module snaps its own progress to the answer, so the four doors arrive in one frame — the same
+   answer the rail gives when it stops measuring and starts counting — and nothing travels to get
+   there. The panel's own hover inversion is a state change too, and it cuts with everything else. */
+html[data-motion="off"] .index-panel,
+html[data-motion="off"] .index-panels,
+html[data-motion="off"] .ip-inner,
+html[data-motion="off"] .ip-frame,
+html[data-motion="off"] .ip-seam,
+html[data-motion="off"] .ip-arrow,
+html[data-motion="off"] #flood{transition:none;}
 
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
@@ -1585,11 +2159,12 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   .stat-snap{transition:none;transform:none;opacity:1}
   .hero__stage{opacity:1}
   /* §06: the sheet's motion is a script, so the media query has to say it by name — the same
-     four selectors the data-motion block above uses, for the same reason. */
+     selectors the data-motion block above uses, for the same reason. */
   #hero [data-parallax-speed],
-  #hero [data-skew],
+  #hero,
   .hero-gear-asterisk,
   .rp-layer{transform:none!important}
+  .sound-wave .wv{transform:scaleY(0.5)!important}
   .clip-img,.eid-reveal,.who-photo{animation:none!important}
   .grain-heavy::after,.grain-light::after,.grain-deep::after{opacity:0}
   .frame{transition:none!important}
@@ -1601,13 +2176,17 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   .ledger-row{animation:none}
   .floor-rule,.floor-arrow{transition:none!important;transform:none!important}
   /* ink bleed: the wick is texture, not motion — it stays. The transition does not. */
-  :is(.section-title,.work-title,.mag-title-1,.mag-title-2,.reach-heading .mask-inner,.hero__title,.nav-bc,.nav-menu-link,.set-track,.set-knob){transition:none!important}
+  :is(.section-title,.work-title,.mag-title-1,.mag-title-2,.reach-heading .mask-inner,.hero__title,.head-nav-link,.metro-block,.set-track,.set-knob){transition:none!important}
   /* Workstream B: the bar still moves — that IS headroom, not decoration — but it cuts instead
      of sliding, and the drawer arrives in one frame. */
   .head-bar,.set-drawer{transition:none!important}
-  /* §06/§06b: the plate reveal lands instantly, and the signboard is a still strip. */
+  /* §06/§06b: the plate reveal lands instantly, the wave is held, and the board is static ink. */
   .hero-line > .name-line{transform:none!important}
-  .marquee-track{animation:none!important}
+  .hero__title:hover .name-line{text-shadow:none}
+  /* §16d — the three states still change; what is cut is the ink crossing the screen for them, which
+     is a movement and not a state, and the plate's hover inversion, which becomes an instant swap. */
+  #flood,.index-panels,.index-panel,.ip-inner,.ip-frame,.ip-seam,.ip-arrow,.pull-peek,.head-index,.back-index{transition:none!important}
+  .sound-wave .wv{transform:scaleY(0.5)!important}
 }
 </style>
 
@@ -1618,14 +2197,29 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   body,a,button,input,textarea,.dt-wrap,.bingo-wrap,.reach-link,.art-return{cursor:auto!important}
   #cur{display:none!important}
   .hero__title{opacity:1!important}
+  /* §06 — WITHOUT SCRIPT THERE IS NO fitName(). The masthead takes a clamp that is already right
+     at every audited width (300px was only ever the fitter's first guess), so the name is neither
+     held at 1rem nor left at the fallback size. */
+  .hero__title .name-line{font-size:clamp(4rem,17vw,13rem)!important}
   .hero-line > .name-line{transform:none!important}
   .mask-inner{transform:none!important}
   .stat-snap{transform:none!important;opacity:1!important}
   /* the toggle would be a dead control without scripting — main.js is what binds it */
   #soundToggle{display:none!important}
+  /* §16 — THE GATE'S CONTROLS ARE STATE CHANGES, and without a state machine they are dead
+     controls. The head's ← INDEX, every section's BACK TO INDEX and the pull-up hint all go; the
+     stacked broadsheet they would return you to is already what the page is. The four index
+     panels stay in the markup but their `visibility:hidden` default keeps them out of the tab
+     ring, so the board remains the one list of places a no-script visitor is offered. */
+  #headIndex,.back-index,.pull-peek{display:none!important}
 </style></noscript>
 </head>
 <body>
+
+<!-- THE WAY PAST THE HEAD (§08). First in the body, first in the tab order, invisible until it
+     takes focus — then it drops out from under the fixed bar as a paper tab. It targets #main,
+     which is the sheet and everything below it; the head, the board and the footer are outside. -->
+<a class="skip-link" href="#main">Skip to content</a>
 
 <div id="cur" aria-hidden="true"><span id="curWord"></span></div>
 
@@ -1638,46 +2232,52 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
 
 <header class="site-head" id="siteHead">
 <div class="head-bar" id="siteNav">
-  <!-- LEFT: where you are. The breadcrumb is the section label, and it is the menu's handle. -->
-  <div class="nav-left">
-    <button type="button" class="nav-bc" id="navBc" aria-expanded="false" aria-controls="navMenu">
-      <span class="nav-bc-label" id="navBcLabel">Aliasgar Dalal</span>
-      <span class="nav-bc-caret" aria-hidden="true">&#9662;</span>
-    </button>
-    <!-- THE LIST — a disclosure, not a modal. The last row is a door: it keeps href="#footerB1"
-         as its no-JS answer and carries aria-controls="artOverlay", which is the same selector
-         the wall's own module binds, so it opens the room instead of scrolling to the plate. -->
-    <div class="nav-menu" id="navMenu" hidden>
-      <ul class="nav-menu-list">
-        <li><a class="nav-menu-link" href="#who" data-nav-for="who"><span class="nav-menu-n">01</span><span>Who</span></a></li>
-        <li><a class="nav-menu-link" href="#work" data-nav-for="work"><span class="nav-menu-n">02</span><span>Work</span></a></li>
-        <li><a class="nav-menu-link" href="#magazine" data-nav-for="magazine"><span class="nav-menu-n">*</span><span>Akcidental Vision</span></a></li>
-        <li><a class="nav-menu-link" href="#reach" data-nav-for="reach"><span class="nav-menu-n">03</span><span>Get in touch</span></a></li>
-        <li><a class="nav-menu-link nav-menu-door" href="#footerB1" data-cursor="archive" aria-controls="artOverlay" aria-haspopup="dialog" aria-expanded="false"><span class="nav-menu-n">B1</span><span>Personal archive</span></a></li>
-      </ul>
-    </div>
-  </div>
-  <!-- THE ROW OF PLACES (D3). Four links, the same four the strip prints, each owning one `--pop`
-       inline — a colour its own section already uses below the fold (oxblood in who's footnotes,
-       the riso rose in work's log, brass in the magazine, bone on reach's dark field), so hovering
-       a name here and arriving in that section are the same colour. `data-nav-for` is the same
-       attribute the five list rows carry, so main.js writes `aria-current` here and there in one
-       pass — the list and the row cannot disagree about where the visitor is. -->
+  <!-- LEFT: where you are — the masthead's own name, and therefore the way home. The volume is a
+       --muted span, so the name reads first and the edition second. One link, no disclosure: the
+       section list this bar used to open is gone (§05), and the four places are named outright in
+       the middle zone and printed again, in colour, on the board under the sheet (§06b). -->
+  <a class="head-brand" href="#hero">Aliasgar Dalal <span>&mdash; Vol. I</span></a>
+  <!-- THE FOUR PLACES (§05a). The same four the board prints under the sheet, each owning one
+       `--pop` (--pop-1..4) — so the square that lights on hover is the same ink the block wears
+       on the board, and hovering a place here and arriving at it there are one colour system.
+       `data-nav-for` is read by the section observer in main.js: one write of aria-current feeds
+       every surface that carries the attribute, so the bar and the board cannot disagree. -->
   <nav class="head-nav" aria-label="Sections">
-    <a class="head-nav-link" href="#who" data-nav-for="who" style="--pop:var(--accent)"><span class="head-nav-pop" aria-hidden="true"></span><span class="head-nav-n">01</span><span class="head-nav-label">Who</span></a>
-    <a class="head-nav-link" href="#work" data-nav-for="work" style="--pop:#C06060"><span class="head-nav-pop" aria-hidden="true"></span><span class="head-nav-n">02</span><span class="head-nav-label">Work</span></a>
-    <a class="head-nav-link" href="#magazine" data-nav-for="magazine" style="--pop:var(--brass)"><span class="head-nav-pop" aria-hidden="true"></span><span class="head-nav-n">&lowast;</span><span class="head-nav-label">Akcidental Vision</span></a>
-    <a class="head-nav-link" href="#reach" data-nav-for="reach" style="--pop:var(--bone)"><span class="head-nav-pop" aria-hidden="true"></span><span class="head-nav-n">03</span><span class="head-nav-label">Get in touch</span></a>
+    <a class="head-nav-link" href="#who" data-nav-for="who" style="--pop:var(--pop-1)"><span class="head-nav-n">01</span><span class="head-nav-label">Who</span></a>
+    <a class="head-nav-link" href="#work" data-nav-for="work" style="--pop:var(--pop-2)"><span class="head-nav-n">02</span><span class="head-nav-label">Work</span></a>
+    <a class="head-nav-link" href="#magazine" data-nav-for="magazine" style="--pop:var(--pop-3)"><span class="head-nav-n">&lowast;</span><span class="head-nav-label">Akcidental Vision</span></a>
+    <a class="head-nav-link" href="#reach" data-nav-for="reach" style="--pop:var(--pop-4)"><span class="head-nav-n">03</span><span class="head-nav-label">Get in touch</span></a>
   </nav>
-  <!-- RIGHT: the settings drawer's only handle. A drawn gear, not a glyph: at 19px the
-       character &#9881; renders differently in every fallback face. -->
+  <!-- RIGHT: the wave, then the settings drawer's only handle. The sound mark moved here from the
+       drawer (§05d): same id, same aria-pressed, same storage key, so the audio module's binding
+       and the visitor's stored preference are untouched — but the state is now visible without
+       opening a panel. -->
+  <div class="head-actions">
+    <!-- §16 — THE WAY BACK TO THE CONTENTS. A view is entered from the index, so the bar's first
+         control is the door out of it: ← INDEX goes back to the panels, not to a section. It is a
+         <button> because it changes a state, and it is first in this zone because it is the only
+         control here that is about the page rather than about the site's own settings. -->
+    <button type="button" class="head-index" id="headIndex" aria-label="Back to the index">Index</button>
+    <button type="button" class="sound-toggle" id="soundToggle" aria-pressed="true" aria-label="Sound">
+      <span class="sound-word" aria-hidden="true">Sound</span>
+      <!-- FIVE BARS, 2.4 WIDE WITH rx 1.2, in a 26x14 box: at rest each is scaleY(.12) — a 1.7px
+           hairline — and while sound is on each is tweened to its own height and phase. The SVG is
+           aria-hidden; the button's label and aria-pressed carry the meaning. -->
+      <svg class="sound-wave" viewBox="0 0 26 14" aria-hidden="true" focusable="false">
+        <rect class="wv" x="0" y="0" width="2.4" height="14" rx="1.2"/>
+        <rect class="wv" x="5.6" y="0" width="2.4" height="14" rx="1.2"/>
+        <rect class="wv" x="11.2" y="0" width="2.4" height="14" rx="1.2"/>
+        <rect class="wv" x="16.8" y="0" width="2.4" height="14" rx="1.2"/>
+        <rect class="wv" x="22.4" y="0" width="2.4" height="14" rx="1.2"/>
+      </svg>
+    </button>
+  <!-- THE GEAR — a drawn cog, not a glyph: at 19px the character &#9881; renders differently in every
+       fallback face. A hub, a rim, and eight teeth standing outside the rim (r 9.5 -> 6.5), so the
+       rim stays a continuous circle at every size. It opens the drawer, and that is all it does. -->
   <button type="button" class="nav-gear" id="setOpen" aria-label="Settings" aria-haspopup="dialog" aria-controls="setPanel" aria-expanded="false">
-    <!-- a COG, not an asterisk: a hub, a rim, and eight teeth standing outside the rim. The old
-         glyph was a small circle with eight radiating ticks — at 19px it read as the site's own
-         mark, which is the one thing the settings handle must not be. Teeth run r 9.5 → 6.5 so
-         the rim stays a continuous circle at every size. -->
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.28 5.28l2.12 2.12M16.6 16.6l2.12 2.12M18.72 5.28L16.6 7.4M5.28 18.72L7.4 16.6"/></svg>
   </button>
+  </div>
 </div>
 </header>
 
@@ -1694,10 +2294,8 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
     <button type="button" class="set-close" id="setClose" aria-label="Close settings">&times;</button>
   </div>
   <div class="set-body" data-lenis-prevent>
-    <button type="button" class="sound-toggle" id="soundToggle" aria-pressed="true" aria-label="Sound">
-      <span class="sound-word" aria-hidden="true">Sound</span>
-      <span class="sound-ring" aria-hidden="true"></span>
-    </button>
+    <!-- THE SOUND MARK LIVES IN THE HEAD NOW (§05d). It is not a drawer row any more: the wave is
+         in the bar, next to the gear, where its state can be read without opening this panel. -->
 
     <button type="button" class="set-row" id="prefA11y" role="switch" aria-checked="false">
       <span class="set-label">Accessibility</span>
@@ -1742,25 +2340,64 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
       <feFuncA type="linear" slope="1.06" intercept="-0.02"/>
     </feComponentTransfer>
   </filter>
+  <!-- THE CRUMPLE (§06) — the sticker's gloss is a light, and laminate is not flat. A high-frequency
+       noise field (0.85) at ONE octave displaces the gradient by up to 5px, which is enough to break a
+       clean conic streak into the fine creases a vinyl film actually has, and far too little to make
+       the highlight look torn. One octave on purpose: two or three would add large-scale lumps and the
+       light would read as fabric instead of film. The region is padded well past the plate because
+       feDisplacementMap samples outside the object box and the default −10%/120% would crop the
+       displaced edge back to a hard line — the same mistake the ink bleed above already documents. -->
+  <filter id="glossWarp" x="-12%" y="-12%" width="124%" height="124%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="1" seed="3" result="crease"/>
+    <feDisplacementMap in="SourceGraphic" in2="crease" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
 </svg>
-<section id="hero" class="grain-heavy" data-nav="hero" data-nav-label="Aliasgar Dalal">
-  <!-- THE SHEET'S FURNITURE: the stock, four crop marks, the registration mark. -->
+<main id="main" tabindex="-1">
+<!-- ── THE GATE (§16d) ────────────────────────────────────────────────────────────
+     Three states in one block, and the state is ONE attribute on <html>: cover, index, view.
+       cover  the fold. #hero is one screen, the board is its floor, and the index is one decision
+              away — a wheel tick down, a finger's swipe up, ArrowDown/PageDown.
+       index  the same one screen, contents side out: the strip of blocks at the fold has ENLARGED
+              INTO the four plates, which rest in their own `--pop` colours and invert under the
+              pointer. Nothing on the page has moved; the module tweened its own progress to 1.
+       view   the gate is NOT RENDERED (`display:none`), exactly one `[data-view]` section is, and
+              the head comes back over it. A view is chosen, never scrolled to.
+     THE GATE IS ONE SCREEN, THE MODULE OWNS THE TRANSITION. `.gate` and `.gate-stage` are both
+     `100svh`, so `window.scrollY` is 0 in both states and a reader who stops scrolling cannot
+     leave the index half-open. The move between them is a tween of the module's own `p` (0.85s,
+     0.7s on a phone) started by an intent that meant it — never by a scroll position. The stage
+     stays a real box so `#indexPanels` keeps an `offsetParent` and its quarters keep measuring. -->
+<section class="gate" id="gate" aria-label="Cover and contents">
+<div class="gate-stage" id="gateStage">
+<section id="hero" class="grain-heavy" data-nav="hero">
+  <!-- THE SHEET'S FURNITURE: the stock, the fold, the folio. Nothing printed here is an asset —
+       the tooth is one SVG filter, the fold is two 1px lines, the folio is type. -->
   <div class="hero-paper" aria-hidden="true" data-parallax-speed="0.8"></div>
-  <span class="hero-crop crop-tl" aria-hidden="true"></span>
-  <span class="hero-crop crop-tr" aria-hidden="true"></span>
-  <span class="hero-crop crop-bl" aria-hidden="true"></span>
-  <span class="hero-crop crop-br" aria-hidden="true"></span>
-  <svg class="reg-crosshair" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
-    <circle cx="20" cy="20" r="11.2"/>
-    <path d="M20 1.5v9M20 29.5v9M1.5 20h9M29.5 20h9"/>
-    <path d="M20 15.4v9.2M15.4 20h9.2"/>
-  </svg>
+  <span class="hero-fold" aria-hidden="true"></span>
+  <!-- THE FOLIO (§06). Three zones: volume + city (grunge), the dateline (editorial, flanked by
+       hairlines), the clock (grunge, HH:MM, 24-hour). The clock is a <time> with a real datetime:
+       the grunge face is aria-hidden because a screen reader should hear "fourteen oh five", not
+       five separate digits. main.js updates it once a minute — see the clock module. -->
+  <div class="hero__folio">
+    <p class="folio-vol">Vol. I <span class="folio-city">&mdash; Sharjah, UAE</span></p>
+    <p class="folio-date">
+      <span class="folio-rule" aria-hidden="true"></span>
+      <span>2026</span>
+      <span class="folio-sep" aria-hidden="true"></span>
+      <span>The First Edition</span>
+      <span class="folio-rule" aria-hidden="true"></span>
+    </p>
+    <p class="folio-clock"><time id="folioClock" datetime="">
+      <span class="sr-only" id="folioClockLabel">00:00</span>
+      <span class="folio-clock-face" aria-hidden="true"><span class="dg">0</span><span class="dg">0</span><span class="cl">:</span><span class="dg">0</span><span class="dg">0</span></span>
+    </time></p>
+  </div>
   <div class="hero__stage">
     <!-- THE MASTHEAD. Two rows, two words, two stickers. The h1 is the whole type block; each row
          is a `.sticker-group` (an inline-block, so it is exactly as wide as its word) holding the
          masked line and the vinyl plate that peels off it. `data-parallax-speed` is read once by
          main.js: 1 is the page's own speed, 0.8 lags behind it, 1.5 runs ahead. -->
-    <h1 class="hero__title" id="nameBlock" data-parallax-speed="1" data-skew>
+    <h1 class="hero__title" id="nameBlock" data-parallax-speed="1">
       <span class="sticker-row">
         <span class="sticker-group">
           <span class="hero-line"><span class="name-line line-1" id="line1">Aliasgar</span></span>
@@ -1768,13 +2405,21 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
                one, but it is deliberately out of the Tab ring and out of the accessibility tree:
                there is no keyboard equivalent of "move this 40px to the left", and a button that
                announces itself and then does nothing is a worse lie than a sticker that is simply
-               decoration. The masthead above it carries the name for everyone. -->
+               decoration. The masthead above it carries the name for everyone.
+               THREE LAYERS INSIDE ONE PLATE (§06): shadow, body, gloss — all inside
+               `.sticker__plate`, which is the node that carries the resting angle. Draggable owns
+               `.sticker`'s transform; the plate's pose uses `rotate`/`translate` and cannot fight
+               it. `data-cursor="peel"` is the reticle's word for this state. -->
           <span class="sticker-slot" data-parallax-speed="1.5">
-            <button type="button" class="sticker" tabindex="-1" aria-hidden="true">
-              <span class="sticker__shadow" aria-hidden="true"><img src="images/sticker-aliasgar.png" width="2000" height="2000" alt="" decoding="async"></span>
-              <span class="sticker__body"><img src="images/sticker-aliasgar.png" width="2000" height="2000" alt="" decoding="async"></span>
-              <span class="sticker__gloss" aria-hidden="true"></span>
-            </button>
+            <span class="sticker-home sticker--aliasgar">
+              <button type="button" class="sticker" tabindex="-1" aria-hidden="true" data-cursor="peel">
+                <span class="sticker__plate">
+                  <span class="sticker__shadow" aria-hidden="true"><img src="images/sticker-aliasgar.png" width="1905" height="461" alt="" decoding="async"></span>
+                  <span class="sticker__body"><img src="images/sticker-aliasgar.png" width="1905" height="461" alt="" decoding="async"></span>
+                  <span class="sticker__gloss" aria-hidden="true"></span>
+                </span>
+              </button>
+            </span>
           </span>
         </span>
       </span>
@@ -1784,63 +2429,126 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
                the first letter keeps full cap height and the rest sit at x-height. -->
           <span class="hero-line"><span class="name-line line-2" id="line2"><span class="small-caps">DALAL</span></span></span>
           <span class="sticker-slot" data-parallax-speed="1.5">
-            <button type="button" class="sticker sticker--dalal" tabindex="-1" aria-hidden="true">
-              <span class="sticker__shadow" aria-hidden="true"><img src="images/sticker-dalal.png" width="1918" height="657" alt="" decoding="async"></span>
-              <span class="sticker__body"><img src="images/sticker-dalal.png" width="1918" height="657" alt="" decoding="async"></span>
-              <span class="sticker__gloss" aria-hidden="true"></span>
-            </button>
+            <span class="sticker-home sticker--dalal">
+              <button type="button" class="sticker" tabindex="-1" aria-hidden="true" data-cursor="peel">
+                <span class="sticker__plate">
+                  <span class="sticker__shadow" aria-hidden="true"><img src="images/sticker-dalal.png" width="1918" height="657" alt="" decoding="async"></span>
+                  <span class="sticker__body"><img src="images/sticker-dalal.png" width="1918" height="657" alt="" decoding="async"></span>
+                  <span class="sticker__gloss" aria-hidden="true"></span>
+                </span>
+              </button>
+            </span>
           </span>
         </span>
       </span>
     </h1>
   </div>
-  <!-- ONE PLATE, THREE INKS (§06). The same 699×532 file three times, so the browser fetches it
-       once; each pass is a drum of ink, multiplied over the stock, and the KEY prints last because
-       that is the order the presses run in. width/height are the file's own, so the sheet reserves
-       the plate before the bytes land. The portrait is a button: click (or Enter/Space) shuffles
-       which drum is on top. -->
-  <div class="riso-portrait" id="risoPortrait" role="button" tabindex="0" aria-label="Shuffle the inks on the portrait" data-parallax-speed="1.2" data-skew>
+  <!-- ONE FILE, FOUR PASSES (§06). The same 699×532 image four times, so the browser fetches it
+       once: the SHADOW (a silhouette, brightness(0), offset 10/14 and multiplied at 24% — the
+       cardstock the print sits on), then red, then blue, then the key last, because that is the
+       order the drums run in. width/height are the file's own, so the sheet reserves the plate
+       before the bytes land. The portrait is a button: click (or Enter/Space) shuffles the drums. -->
+  <div class="riso-portrait" id="risoPortrait" role="button" tabindex="0" aria-label="Shuffle the inks on the portrait" data-parallax-speed="1.2">
+    <img class="rp-layer rp-shadow" src="images/hero-photo-new.png" width="699" height="532" alt="" aria-hidden="true" decoding="async">
     <img class="rp-layer rp-red" src="images/hero-photo-new.png" width="699" height="532" alt="" aria-hidden="true" decoding="async">
     <img class="rp-layer rp-blue" src="images/hero-photo-new.png" width="699" height="532" alt="" aria-hidden="true" decoding="async">
     <img class="rp-layer rp-key" src="images/hero-photo-new.png" width="699" height="532" alt="Aliasgar Dalal" fetchpriority="high" decoding="async">
   </div>
-  <!-- THE GEAR — the colophon, turning against scroll progress. aria-hidden: it is a mark, not a
-       control (the settings drawer has its own cog, and that one IS a button). -->
-  <svg class="hero-gear-asterisk" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-    <circle cx="50" cy="50" r="34"/>
-    <circle cx="50" cy="50" r="13"/>
-    <path d="M50 4v16M50 80v16M4 50h16M80 50h16M17.5 17.5l11.3 11.3M71.2 71.2l11.3 11.3M82.5 17.5L71.2 28.8M28.8 71.2L17.5 82.5"/>
-  </svg>
+  <!-- THE ASTERISK — the colophon, and the one thing on the sheet that moves. One character of the
+       masthead's own face at display scale; main.js indexes it 15° at a time against scroll (and
+       holds it still under stillMotion()). aria-hidden: it is a mark, not a control. -->
+  <span class="hero-gear-asterisk hero-asterisk-mark" aria-hidden="true">&#42;</span>
 </section>
 
-<!-- ── THE CONTENTS STRIP (§06b) ────────────────────────────────────────────────
-     The hero's exit and the bar's entrance: sticky at the top of the page, five names running
-     sideways, handed over to the fixed bar as it docks (main.js writes both fades from one
-     measurement). The second list is the seam for the -50% loop; it is aria-hidden and its links
-     are tabindex=-1, so a screen reader and the Tab ring hear the contents exactly once. -->
-<div class="marquee-toc" id="marqueeToc">
-  <div class="marquee-track" id="marqueeTrack">
-    <ul class="marquee-set">
-      <li><a class="marquee-link" href="#who"><span class="marquee-n">01</span><span>Who</span></a></li>
-      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
-      <li><a class="marquee-link" href="#work"><span class="marquee-n">02</span><span>Work</span></a></li>
-      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
-      <li><a class="marquee-link" href="#magazine"><span class="marquee-n">&lowast;</span><span>Akcidental Vision</span></a></li>
-      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
-      <li><a class="marquee-link" href="#reach"><span class="marquee-n">03</span><span>Get in touch</span></a></li>
-      <li aria-hidden="true"><span class="marquee-star">&lowast;</span></li>
-    </ul>
-    <ul class="marquee-set" aria-hidden="true">
-      <li><a class="marquee-link" href="#who" tabindex="-1"><span class="marquee-n">01</span><span>Who</span></a></li>
-      <li><span class="marquee-star">&lowast;</span></li>
-      <li><a class="marquee-link" href="#work" tabindex="-1"><span class="marquee-n">02</span><span>Work</span></a></li>
-      <li><span class="marquee-star">&lowast;</span></li>
-      <li><a class="marquee-link" href="#magazine" tabindex="-1"><span class="marquee-n">&lowast;</span><span>Akcidental Vision</span></a></li>
-      <li><span class="marquee-star">&lowast;</span></li>
-      <li><a class="marquee-link" href="#reach" tabindex="-1"><span class="marquee-n">03</span><span>Get in touch</span></a></li>
-      <li><span class="marquee-star">&lowast;</span></li>
-    </ul>
-  </div>
+<!-- ── THE METROBOARD (§06b) ──────────────────────────────────────────────────────
+     The sheet's exit and the page's contents: four full-block links, each in its own printed ink,
+     each exactly as tall as the token #hero subtracts — so the hero and the board are one viewport
+     to the pixel. `data-nav-for` is the same attribute the head's row carries: one observer writes
+     aria-current to every surface at once, and the block you are reading is the block that is lit.
+     In flow, not sticky: the head already owns the top of the screen. -->
+<nav class="metroboard" aria-label="Sections">
+  <a class="metro-block" href="#who" data-nav-for="who" style="--pop:var(--pop-1)"><span class="metro-n">01</span><span class="metro-t">Who</span></a>
+  <a class="metro-block" href="#work" data-nav-for="work" style="--pop:var(--pop-2)"><span class="metro-n">02</span><span class="metro-t">Work</span></a>
+  <a class="metro-block" href="#magazine" data-nav-for="magazine" style="--pop:var(--pop-3)"><span class="metro-n">&#42;</span><span class="metro-t">Akcidental Vision</span></a>
+  <a class="metro-block" href="#reach" data-nav-for="reach" style="--pop:var(--pop-4)"><span class="metro-n">03</span><span class="metro-t">Get in touch</span></a>
+</nav>
+
+<!-- ── THE FOUR PANELS (§16) ─────────────────────────────────────────────────────
+     The end of the index. The same four places the board prints as a strip, at reading size, with
+     the one line of the work that belongs to each, and the block's own `--pop` as the plate's ink.
+     THE OPENING IS A MORPH, NOT A FADE. The module measures each block's rectangle and each plate's
+     quarter here, and on every frame of the scrub it scales a plate out of a block and counter-
+     scales the type by exactly the inverse, so what the reader sees is the bottom bar growing into
+     a contents page and nothing crossfading to get there.
+     `inert` AND `aria-hidden` UNTIL THE SCRUB HAS FINISHED. `visibility:hidden` already takes the
+     subtree out of the tab ring, but it does not take it out of the accessibility tree in every
+     engine, and a screen reader walking a cover should never meet four doors it cannot see. The
+     module lifts both attributes on the frame the plates arrive, and puts them back going up. -->
+<div class="index-panels" id="indexPanels" inert aria-hidden="true">
+  <a class="index-panel" href="#who" data-open-view="who" style="--pop:var(--pop-1)">
+    <span class="ip-frame" aria-hidden="true"></span>
+    <span class="ip-inner">
+      <span class="ip-top"><span class="ip-num">01</span><span class="ip-folio">&numero;</span></span>
+      <span class="ip-body">
+        <span class="ip-t">Who</span>
+        <span class="ip-teaser">Twenty years old. Mumbai, then Sharjah. Management at Stirling, and the work that happens where design and marketing overlap.</span>
+      </span>
+      <span class="ip-meta"><span class="ip-cta">Read the sheet</span><span class="ip-arrow" aria-hidden="true"></span></span>
+    </span>
+  </a>
+  <a class="index-panel" href="#work" data-open-view="work" style="--pop:var(--pop-2)">
+    <span class="ip-frame" aria-hidden="true"></span>
+    <span class="ip-inner">
+      <span class="ip-top"><span class="ip-num">02</span><span class="ip-folio">&numero;</span></span>
+      <span class="ip-body">
+        <span class="ip-t">Work</span>
+        <span class="ip-teaser">Two case studies from Aldes Middle East: a 4-fold product leaflet that went to six rounds, and an Eid campaign that travelled eight times further than the platform average.</span>
+      </span>
+      <span class="ip-meta"><span class="ip-cta">Open the cases</span><span class="ip-arrow" aria-hidden="true"></span></span>
+    </span>
+  </a>
+  <a class="index-panel" href="#magazine" data-open-view="magazine" style="--pop:var(--pop-3)">
+    <span class="ip-frame" aria-hidden="true"></span>
+    <span class="ip-inner">
+      <span class="ip-top"><span class="ip-num">&lowast;</span><span class="ip-folio">&numero;</span></span>
+      <span class="ip-body">
+        <span class="ip-t">Akcidental Vision</span>
+        <span class="ip-teaser">A magazine started at 17. Issue 01, two writers, 5,000 views, and an asterisk that marks the opposite of a mistake.</span>
+      </span>
+      <span class="ip-meta"><span class="ip-cta">Read Issue 01</span><span class="ip-arrow" aria-hidden="true"></span></span>
+    </span>
+  </a>
+  <a class="index-panel" href="#reach" data-open-view="reach" style="--pop:var(--pop-4)">
+    <span class="ip-frame" aria-hidden="true"></span>
+    <span class="ip-inner">
+      <span class="ip-top"><span class="ip-num">03</span><span class="ip-folio">&numero;</span></span>
+      <span class="ip-body">
+        <span class="ip-t">Get in touch</span>
+        <span class="ip-teaser">Email, LinkedIn, and 25.3463&deg;N 55.4209&deg;E. Sharjah, UAE &mdash; and a ledger at the foot of the page.</span>
+      </span>
+      <span class="ip-meta"><span class="ip-cta">Write to him</span><span class="ip-arrow" aria-hidden="true"></span></span>
+    </span>
+  </a>
+  <span class="ip-seam ip-seam-v" aria-hidden="true"></span>
+  <span class="ip-seam ip-seam-h" aria-hidden="true"></span>
+</div>
+</div><!-- /gate-stage -->
+</section><!-- /gate -->
+
+<!-- THE PULL-UP (§16). Phones have no Escape key, so a view's second door is the gesture the
+     platform already taught them: pull up at the end of the page. It is a SIBLING of the gate, not a
+     child, for one structural reason: in a view the gate is `display:none`, and a fixed drawer
+     inside a display:none subtree is not painted at all — the one state that needs this door is the
+     one state that would have hidden it. aria-hidden because it is an instruction for a gesture and
+     never a control; the module arms it only while the view is at its end and a finger is on the
+     glass, and writes `--pull` from the drag itself so the drawer rises with the thumb. -->
+<div class="pull-peek" id="pullPeek" aria-hidden="true" data-prompt="rest">
+  <span class="pull-peek-bands" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+  <span class="pull-peek-prompt">
+    <span class="pull-peek-arrow" aria-hidden="true"></span>
+    <span class="pull-peek-rest">Pull up for the index</span>
+    <span class="pull-peek-armed">Release for the index</span>
+  </span>
 </div>
 
 <svg width="0" height="0" style="position:absolute">
@@ -1855,7 +2563,15 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   </filter>
 </svg>
 
-<section id="who" class="grain-light" data-nav="who" data-nav-label="01 &mdash; Who">
+<!-- ── THE BROADSHEET (§16) ─────────────────────────────────────────────────────
+     ONE wrapper around the four places, and it is the hard stop: in the cover and the index the
+     stylesheet folds THIS box to zero height and clips it, so the document ends on the gate's last
+     pixel while every rect inside stays real and measurable. In a view the wrapper is the page and
+     the three places the reader is not in are `display:none` (keyed on `inert`, the module's own
+     word for it). The two overlays that live between the sections are `position:fixed`, so they are
+     neither clipped nor sized by it — a wall opens over the page, not inside a band of it. -->
+<div id="broadsheet">
+<section id="who" class="grain-light" data-nav="who" data-view="who">
   <div class="frame-main">
   <div class="who-header">
     <span class="section-label">01 &mdash; Who</span>
@@ -1863,7 +2579,7 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   </div>
   <div class="who-body">
     <div class="who-left">
-      <div class="who-photo-wrap"><img class="who-photo" src="images/hero-photo.png" alt="Aliasgar Dalal"></div>
+      <div class="who-photo-wrap"><img class="who-photo" src="images/hero-photo.png" alt="Aliasgar Dalal" loading="lazy" decoding="async"></div>
       <span class="who-caption">Aliasgar Dalal &mdash; Sharjah, UAE</span>
     </div>
     <div class="who-right">
@@ -1886,9 +2602,12 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
     </div>
   </div>
   </div><!-- /frame-main -->
+  <!-- §16 — THE DOOR OUT OF THE VIEW. Last in the section's flow and drawn in the section's own
+       ink, so returning to the contents reads as the end of the sheet rather than as chrome. -->
+  <button type="button" class="back-index" data-back-index>Back to the index</button>
 </section>
 
-<section id="work" data-nav="work" data-nav-label="02 &mdash; Work">
+<section id="work" data-nav="work" data-view="work">
   <div class="frame-main">
   <div class="work-header">
     <h2 class="mask-wrap"><span class="mask-inner work-title">WORK<em>.</em></span></h2>
@@ -1991,6 +2710,9 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
     <p class="case-p case-p-tight">The design work gets noticed first. The operations work is why anything ships. Both were on the job from week one.</p>
   </div>
   </div><!-- /frame-main -->
+  <!-- §16 — and the same door at the foot of the cases: three thousand pixels of work should not
+       end in nothing. -->
+  <button type="button" class="back-index" data-back-index>Back to the index</button>
 </section>
 
 <!-- LEAFLET MODAL — one sheet, four panels, three hinges.
@@ -2004,22 +2726,22 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
     <div class="lf-rig" id="lfRig" data-axis="y">
       <div class="lf-accordion" id="lfAccordion">
         <div class="lf-leaf">
-          <div class="lf-face lf-face--front"><img src="images/lf-cover.webp" alt="Cover"></div>
+          <div class="lf-face lf-face--front"><img src="images/lf-cover.webp" alt="Cover" loading="lazy" decoding="async"></div>
           <div class="lf-face lf-face--back"><img data-src="images/lf-prod4.webp" alt="Product spread, panel four"></div>
           <i class="lf-crease" aria-hidden="true"></i>
         </div>
         <div class="lf-leaf">
-          <div class="lf-face lf-face--front"><img src="images/lf-comp1.webp" alt="Inside &mdash; page two"></div>
+          <div class="lf-face lf-face--front"><img src="images/lf-comp1.webp" alt="Inside &mdash; page two" loading="lazy" decoding="async"></div>
           <div class="lf-face lf-face--back"><img data-src="images/lf-prod3.webp" alt="Product spread, panel three"></div>
           <i class="lf-crease" aria-hidden="true"></i>
         </div>
         <div class="lf-leaf">
-          <div class="lf-face lf-face--front"><img src="images/lf-comp2.webp" alt="Inside &mdash; page three"></div>
+          <div class="lf-face lf-face--front"><img src="images/lf-comp2.webp" alt="Inside &mdash; page three" loading="lazy" decoding="async"></div>
           <div class="lf-face lf-face--back"><img data-src="images/lf-prod2.webp" alt="Product spread, panel two"></div>
           <i class="lf-crease" aria-hidden="true"></i>
         </div>
         <div class="lf-leaf">
-          <div class="lf-face lf-face--front"><img src="images/lf-back.webp" alt="Back cover"></div>
+          <div class="lf-face lf-face--front"><img src="images/lf-back.webp" alt="Back cover" loading="lazy" decoding="async"></div>
           <div class="lf-face lf-face--back"><img data-src="images/lf-prod1.webp" alt="Product spread, panel one"></div>
           <i class="lf-crease" aria-hidden="true"></i>
         </div>
@@ -2043,7 +2765,7 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   </div>
 </div>
 
-<section id="magazine" class="grain-light" data-nav="magazine" data-nav-label="Akcidental Vision">
+<section id="magazine" class="grain-light" data-nav="magazine" data-view="magazine">
   <!-- RUNNING HEAD — one line of type. No rule under it, no badge on it. -->
   <div class="mag-folio">
     <span class="mag-issue">Independent Project &mdash; 2023</span>
@@ -2097,9 +2819,11 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
 
   <!-- the section's closing mark — a slug at the outer margin, alone in the air -->
   <p class="mag-note">Issue 02 forthcoming</p>
+  <!-- §16 — the issue closes, the index is the way back to the rest of the paper. -->
+  <button type="button" class="back-index" data-back-index>Back to the index</button>
 </section>
 
-<section id="reach" class="grain-heavy" data-nav="reach" data-nav-label="03 &mdash; Get in touch">
+<section id="reach" class="grain-heavy" data-nav="reach" data-view="reach">
   <div class="frame-main">
   <span class="reach-label">03 &mdash; Get in touch</span>
   <h2 class="reach-heading">
@@ -2111,8 +2835,13 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
     <a class="reach-link" href="https://www.linkedin.com/in/aliasgar-dalal" target="_blank" data-magnetic>LinkedIn &nearr;</a>
   </div>
   <div class="reach-coords">25.3463&deg;N &nbsp;55.4209&deg;E<br>Sharjah, UAE</div>
+  <!-- §16 — the last door. On the ink sheet it is drawn in bone, so it reads at the same weight
+       as the coordinates above it, and it is the one control on this sheet that is not a link. -->
+  <button type="button" class="back-index" data-back-index>Back to the index</button>
   </div><!-- /frame-main -->
 </section>
+</div><!-- /broadsheet -->
+</main>
 
 <footer class="footer">
   <span class="footer-text">Aliasgar Dalal &mdash; Portfolio &copy;2026</span>
@@ -2141,7 +2870,7 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
       <figure class="art-work" style="--art-ratio:2.5"><!-- bingo-light.webp 1500 x 600 = 2.5 -->
         <button type="button" class="art-frame" aria-expanded="false" aria-controls="artPlacard1" data-cursor="work">
           <span class="bingo-wrap" id="bingoWrap">
-            <img class="art-img" id="bingoImg" src="images/bingo-light.webp" width="1500" height="600" alt="Bingo &mdash; a lottery card with a map of the world">
+            <img class="art-img" id="bingoImg" src="images/bingo-light.webp" width="1500" height="600" alt="Bingo &mdash; a lottery card with a map of the world" loading="lazy" decoding="async">
             <span class="bingo-lens" id="bingoLens"></span>
           </span>
         </button>
@@ -2154,7 +2883,7 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
       </figure>
       <figure class="art-work" style="--art-ratio:0.8"><!-- who-portrait.webp 1500 x 1875 = 0.8 -->
         <button type="button" class="art-frame" aria-expanded="false" aria-controls="artPlacard2" data-cursor="work">
-          <img class="art-img who-portrait-img" src="images/who-portrait.webp" width="1500" height="1875" alt="WHO &mdash; self portrait">
+          <img class="art-img who-portrait-img" src="images/who-portrait.webp" width="1500" height="1875" alt="WHO &mdash; self portrait" loading="lazy" decoding="async">
         </button>
         <figcaption class="art-placard" id="artPlacard2">
           <span class="art-placard-no">02</span>
@@ -2211,12 +2940,40 @@ html[data-motion="off"] .hero-line > .name-line{transform:none !important;}
   </div>
 </div>
 
+<!-- ── THE FLOOD (§16) ──────────────────────────────────────────────────────────
+     One node, one plane, one job: carry the ink of the place you pressed across the screen so the
+     swap underneath it is never seen. It is a sibling of everything and a child of the body
+     because it must be able to cover the fixed head and the pull-up; the reticle (9999) still
+     paints above it. Nothing is drawn here — the colour is written to `--flood` from the source
+     block's own `--pop` at the moment of the press, and the only animated property is a scaleY. -->
+<div id="flood" aria-hidden="true"></div>
+<!-- THE FLOOD'S OTHER END (§16). No paint of its own: it is the full-viewport BOUNDS that #flood is
+     Flip-fit to, so the ink can leave the block you pressed instead of rising from the page's
+     bottom edge. Declared here rather than created by the module because the stylesheet is the one
+     place a box is described, and `visibility:hidden` (not `display:none`) keeps it measurable. -->
+<div id="floodProxy" aria-hidden="true"></div>
+
 <!-- GSAP + Flip, SRI-pinned and deliberately NOT deferred: js/main.js runs at the end of
      the body and reads window.gsap at parse time, so a deferred CDN script would arrive
      after the leaflet had already chosen its no-motion path. If either request fails the
      feature detect in main.js falls back to an instant sheet that is still correct. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/gsap.min.js" integrity="sha512-oJ8QbaQThQoJZ7oEv+29jfPM6CcP+zUxh3PKJs1vyOhx0UraUrE7PQgeItu3dOuCJyrzWpoYMsVjkkPEBzbUqw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/Flip.min.js" integrity="sha512-IOMnnN/DFmfIDKRxcNJBUAomidUnrseXW6aZjz05pCrDPatsuqBvilLsKCESzIEMzOMQFayAyI8SWpBLhcqseg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- OBSERVER 3.15.0 — the gate's INTENT layer (§16d), and the one plugin that can state a gesture
+     in one vocabulary. Since Pass 2D the gate has NO scroll travel: it is exactly one screen, and
+     the move between the cover and the contents is a DECISION, not a distance. Observer reports a
+     wheel tick and a finger's swipe through one callback with the raw DOM event still attached
+     (`self.event`), so js/main.js can tell the two devices apart — and it has to, because they
+     disagree about the sign: a wheel turned down is `deltaY > 0`, while the same intent on a
+     touchscreen (advancing the page under the thumb) is `deltaY < 0`, because the finger moved UP.
+     SRI IS THE BYTES, NOT A SNIPPET: 10,014 B fetched from this exact URL, SHA-512 → base64
+     recomputed locally and cross-checked against cdnjs's published SRI for 3.15.0
+     (`Observer.min.js`), and the two agree character for character; `SK.1` re-reads the tag.
+     Not deferred, for the same reason as the two above: js/main.js feature-detects `window.Observer`
+     at parse time, and if this request fails the gate keeps its keyboard doors (ArrowDown/PageDown
+     in the cover, ArrowUp/PageUp in the contents) and its four panels — a missing gesture is a
+     quieter page, not a broken one. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/Observer.min.js" integrity="sha512-28pasLrvjfeQ4EOKQVk6Iihr5mAlO0XhAfbbSgmXT711p3e20uZQRPjcaWt7PXNaNmp9tI67S66K+l38/x8ZCQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- DRAGGABLE 3.15.0 — vendored, not CDN-pinned, for the same reason as Lenis below: it is a plugin
      in GSAP's own registry (window.Draggable) that must be present BEFORE js/main.js runs, and the
      stickers are the only thing that needs it. 35,762 B, LF, BOM-free, SHA-256 EB28FF7A…; upstream

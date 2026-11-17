@@ -139,6 +139,11 @@
       feedCount.textContent = total === 1 ? '1 signature' : total + ' signatures';
     }
     if (emptyEl) emptyEl.hidden = feedEl.children.length > 0;
+    // THE PAGE IS LONGER (OR SHORTER) THAN IT WAS. A row landing changes #reach's height, and two
+    // readers of that height — the progress rail's window arithmetic and the gate's fold edges —
+    // measure it. Neither is allowed to poll, so this one event is the whole contract: main.js
+    // listens and re-schedules its own next frame, exactly as it does for a late font or a load.
+    document.dispatchEvent(new CustomEvent('ad:layout', { detail: { rows: feedEl.children.length } }));
   }
 
   // `origin` is what the row is: "seed" (the first read, already counted by the server's
