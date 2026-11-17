@@ -1,0 +1,8 @@
+# Harness run artifacts — Chrome profiles, screenshots, logs (tests/verify.mjs)
+.cdp-run/
+
+# OS / editor droppings
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
