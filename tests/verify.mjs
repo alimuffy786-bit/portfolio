@@ -466,15 +466,14 @@ try {
   // ═══════════════════════════════════════════════════════════════════════════
   group('6 — A VIEW IS ONE PLACE (exclusive, flood-lit from the block)');
   await enterIndex();
-  const blockBox = await ws.eval(`(() => { const b = document.querySelector('.metro-block[data-nav-for="magazine"]');
-    const r = b.getBoundingClientRect();
-    return { w: r.width, h: r.height, bg: getComputedStyle(b).backgroundColor }; })()`);
-  await ws.eval(`document.querySelector('.metro-block[data-nav-for="magazine"]').click()`);
-  await sleep(70);
-  const flood = await ws.eval(`(() => { const f = document.getElementById('flood'), r = f.getBoundingClientRect();
+  const flood = await ws.eval(`(() => { const b = document.querySelector('.metro-block[data-nav-for="magazine"]');
+    const br = b.getBoundingClientRect(), bb = getComputedStyle(b).backgroundColor;
+    const f = document.getElementById('flood');
+    b.click();                                  // openView → move(): g.set seeds #flood, then Flip.fit
+    const r = f.getBoundingClientRect();        // same task ⇒ the seed frame, before the ticker advances
     return { bg: getComputedStyle(f).backgroundColor, z: +getComputedStyle(f).zIndex,
       curZ: +getComputedStyle(document.getElementById('cur')).zIndex,
-      w: r.width, h: r.height }; })()`);
+      w: r.width, h: r.height, bw: br.width, bh: br.height, blockBg: bb }; })()`);
   const VIEW = `(() => { const g = document.getElementById('gate'), head = document.querySelector('.site-head');
     const vs = [...document.querySelectorAll('[data-view]')];
     const cs = getComputedStyle;
@@ -506,16 +505,16 @@ try {
     `placed ${view.placed.join(',')} / inert ${view.inert.length} / hidden ${view.ariaHidden.length}`);
   ok(view.headVis === 'visible',
     '6.5  the head is back: a place is a page, so it gets the page\'s chrome', `visibility ${view.headVis}`);
-  ok(flood.bg === blockBox.bg,
+  ok(flood.bg === flood.blockBg,
     '6.6  the flood is filled from the BLOCK\'S OWN ink, not from a palette in the script',
-    `flood ${flood.bg} vs block ${blockBox.bg}`);
+    `flood ${flood.bg} vs block ${flood.blockBg}`);
   ok(flood.z > 510 && flood.curZ > flood.z,
     '6.7  the flood covers the head (510) while the reticle stays the top layer (9999)',
     `flood ${flood.z}, reticle ${flood.curZ}`);
-  ok(Math.abs(flood.w - blockBox.w) < blockBox.w * 0.6
-    && Math.abs(flood.h - blockBox.h) < blockBox.h * 0.6 + 1,
+  ok(Math.abs(flood.w - flood.bw) < flood.bw * 0.6
+    && Math.abs(flood.h - flood.bh) < flood.bh * 0.6 + 1,
     '6.8  and it STARTS as the block — the flood has an origin on the screen, so the reader can see where the new page came from',
-    `flood ${Math.round(flood.w)}×${Math.round(flood.h)} from block ${Math.round(blockBox.w)}×${Math.round(blockBox.h)}`);
+    `flood ${Math.round(flood.w)}×${Math.round(flood.h)} from block ${Math.round(flood.bw)}×${Math.round(flood.bh)}`);
   ok(view.active && view.active.startsWith('H'),
     '6.9  focus moves into the place\'s own heading — the route is announced, not merely painted',
     String(view.active));
