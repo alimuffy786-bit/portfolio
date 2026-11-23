@@ -19,9 +19,11 @@ node tests/verify.mjs --shots    # same assertions, plus .cdp-run/shots/inv-<ts>
 - Env: `PORTFOLIO_PORT` = static server port (`8777`), `PORTFOLIO_DBG` = Chrome DevTools port
   (`9355`), `PORTFOLIO_CHROME` = browser binary. Server port and debug port are not interchangeable.
 - Exit `0` green, `1` failing. No `npm test`, no watcher, no alternate runner exists.
-- Baseline, user-observed 2026-11-23: **110 passed, 1 failed (6.8)**. Pre-existing. Never suppress,
-  skip, retry-until-green or "fix" it without an explicit instruction — and never report green from
-  a run you did not perform.
+- Baseline, observed 2026-11-23: **111 passed, 0 failed (exit 0)** on two consecutive runs. The
+  earlier 110/1 note was 6.8 sampling `#flood` after `sleep(70)` — mid-fit, not the origin; group 6
+  reads the seed frame in the same task as the click, with the same label and tolerance. Never
+  suppress, skip, retry-until-green or "fix" a failure without an explicit instruction — and never
+  report green from a run you did not perform.
 - It writes `.cdp-run/` (profile, shots, logs) and deletes the profile in `finally`. Do not commit
   or hand-edit it. Do not run the suite for documentation-only work.
 

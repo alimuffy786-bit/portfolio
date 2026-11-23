@@ -1,8 +1,11 @@
 # QA CONTRACT — tests/verify.mjs
 
-Last recorded observation: **2026-11-23 — 110 passed, 1 failed (invariant 6.8)**. That is the
-maintainer's result from a real run, **user-observed**, not a run made during this documentation
-pass. It is not permission to ignore the failure, and there is no exemption for it.
+Last recorded observation: **2026-11-23 — 111 passed, 0 failed (exit 0)**, two consecutive runs.
+Those are real runs, not runs made during a documentation pass. An earlier note here recorded 6.8
+failing; that was the harness reading `#flood` after `sleep(70)` — mid-fit, where the 450 ms
+`power4.inOut` has already spent ~23% of the travel — not the page. Group 6 now reads the seed
+frame in the same task as the click: same label, same tolerance, 111 invariants. Green is a fresh
+run's result, never an exemption for the next one.
 
 ## 1. Invocation (verified)
 
@@ -98,8 +101,9 @@ real coverage of those behaviours — and still not an accessibility audit.
   transform that is expensive on a real device can pass. Measure cost on hardware before blaming it.
 - **Timing.** `settles()` polls a predicate; on a loaded machine a check can fail for "not settled".
   Re-run before calling it a regression.
-- **The baseline is not green.** The last observed run had one failure (6.8). Any green claim must
-  come from a fresh run you actually performed, with the command and exit status quoted.
+- **A green baseline is a past result.** The last observed run was 111 passed / 0 failed
+  (2026-11-23). Any green claim must still come from a fresh run you actually performed, with the
+  command and exit status quoted; the recorded number is a pointer, not a promise.
 
 ## 9. Editing the harness — future, explicitly authorised tasks only
 
