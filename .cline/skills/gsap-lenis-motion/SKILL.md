@@ -38,6 +38,21 @@ do not describe a timeline as scroll-driven, and do not add a CDN tag without an
 - Anchor jumps and route changes go through the same path as the nav click (:3482), so history and
   `scrollRestoration` stay honest.
 
+## Fidelity gate (not optional)
+
+Every GSAP or Lenis change passes the `cdp-qa-verify` **Implementation & Animation Fidelity Gate**:
+real input that fires the trigger, at least two in-flight transform/attribute samples, and a
+view-close check that nothing is left scheduled.
+
+- "The timeline was constructed" is a syntax check, not an implemented interaction.
+  `gsap.getTweensOf(el)` being non-empty proves a tween object; it proves no wiring and no motion.
+- Drive the actual owner: the gate intent, the nav click (:3482), the Flip morph fit, the wheel
+  through Lenis. Then read `tween.progress()` and the computed transform mid-flight, and read again
+  after `__adGateP` settles. If both reads match the endpoints, the page was not moving.
+- Reopen the view and repeat the gesture: no second timeline, no Flip measured mid-transition, no
+  second Lenis instance, no listener left on the old view.
+- A change reported as `NOT MEASURED` is not done — name the gate point that is missing.
+
 ## Non-negotiables
 
 - With `prefers-reduced-motion: reduce` or `html[data-motion="off"]`: no tweens, no smoothing, no

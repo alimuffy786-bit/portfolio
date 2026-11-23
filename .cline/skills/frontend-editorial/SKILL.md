@@ -42,7 +42,22 @@ red accent, brass for detail, a blackletter masthead. Every visual decision serv
   eye. Residual, not perpetual.
 - Every entrance has a still equivalent at `prefers-reduced-motion: reduce` and `data-motion="off"`.
 
-## Before calling it done
+## Scoped visual & geometry review
 
-Look at it at 390, 768 and 1440, in all three states, motion on and off, with the settings drawer
-open. Contrast-check every new colour pair (accessibility-audit skill) instead of trusting the eye.
+Review the isolated target `[data-view]` — the one `shape()` left live — at `390×844`, `768×1024` and
+`1440×900`, in all three states, motion on and off:
+
+1. Wait for `document.fonts.ready` and for the target's images (`img.complete && img.naturalWidth > 0`)
+   before measuring, or you are inspecting a fallback face.
+2. Headings and captions: wrapping at the measure edge, orphan words, and descender clipping — a
+   tight `line-height` or a clipped `overflow` cutting `g`, `y`, `p` under a display face.
+3. Overlap: separate intentional from accidental. Stamp, tape and sticker overlaps are designed —
+   preserve them. Text over text, a hairline through a glyph, or a control under a plate is a bug.
+4. Focus rings: tab through every control in the target; the ring is visible, unclipped, and not
+   covered by a decorative overlay.
+5. Occlusion: at each interactive target's centre, `document.elementFromPoint(x, y)` resolves to that
+   control or its own descendant — never to an overlay above it.
+6. Screenshots (a `--shots` run or a direct capture) are saved for human aesthetic review and sit
+   beside the programmatic geometry and computed-style numbers, never instead of them.
+
+Contrast-check every new colour pair (accessibility-audit skill) instead of trusting the eye.

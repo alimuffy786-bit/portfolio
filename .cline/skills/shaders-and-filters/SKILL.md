@@ -28,6 +28,25 @@ description: "Use for grain, ink bleed, halftone or displacement work. SVG filte
 - Keep a still fallback: `@media (prefers-reduced-motion: reduce)` and `html[data-motion="off"]` drop
   the animation, not the texture.
 
+## Measured trace & lifecycle gate
+
+Any new ink, filter or canvas effect needs a before/after performance record, not an impression:
+
+1. Record a short Chrome DevTools interaction trace (`5–10s`) on the **unchanged** tree, covering
+   activation and settle; keep the file.
+2. Apply the change, run the identical script, record again. Compare frames, scripting time and paint
+   — the trace names when the effect starts, when it settles, and what runs in between.
+3. Headless `--disable-gpu` flattens real compositing cost (`docs/qa-contract.md` §8): the trace is a
+   shape check, not a verdict on a laptop.
+
+Any of these is an immediate failure, not a tuning note:
+
+- a loop, ticker or rAF still running while its view is `inert`/hidden or `document.hidden`;
+- a duplicate listener or a second ticker after the view is reopened;
+- motion under `prefers-reduced-motion: reduce` or `html[data-motion="off"]` — a leak, not a taste;
+- per-frame GPU allocation: a filter primitive, canvas texture or buffer created inside the frame
+  callback instead of once at setup.
+
 ## If a task explicitly authorises a shader
 
 Treat it as a dependency, not a flourish:

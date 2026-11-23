@@ -12,9 +12,8 @@ use while working — the same technique `tests/verify.mjs` uses, without its 11
 
 - Serve the repo over HTTP; never open `index.html` from `file://` (module-free but absolute paths,
   fonts, and `fetch` all behave differently, and the harness itself always uses `http://127.0.0.1`).
-- Ports are owned by the harness contract: `PORTFOLIO_PORT` (default `8777`) for the server,
-  `PORTFOLIO_DBG` (default `9355`) for Chrome's DevTools endpoint, `PORTFOLIO_CHROME` for the binary.
-  Pick a different server port if 8777 is busy — but keep the debug port distinct and say which you used.
+- Ports are the harness contract: `PORTFOLIO_PORT` server (8777), `PORTFOLIO_DBG` DevTools (9355),
+  `PORTFOLIO_CHROME` binary. If 8777 is busy pick another server port; keep the debug port distinct.
 - Launch headless (`--headless=new`, `--disable-gpu`, `--window-size=1440,900`,
   `--force-device-scale-factor=1`, isolated `--user-data-dir`) so your measurement matches the
   harness's conditions. Do **not** write into `.cdp-run/`.
@@ -42,6 +41,37 @@ use while working — the same technique `tests/verify.mjs` uses, without its 11
   same rule group 13 applies. Check them before declaring success.
 - Screenshots for layout claims (`--shots` in the harness, or a direct capture), remembering that
   `--disable-gpu` makes pixel output a layout check, not a fidelity check.
+
+## Implementation & Animation Fidelity Gate
+
+1. **Contract** — what separates it from a static fade or placeholder: property, from-value, to-value,
+   duration, trigger.
+2. **Wiring** — the real trigger fired (CDP `Input.*` click/wheel/touch/key, scroll, or the owning
+   lifecycle event); `window.gsap` or `gsap.getTweensOf(el)` proves construction, never wiring.
+3. **In-flight samples** — ≥2 distinct mid-execution reads (computed `transform`, rect, attribute),
+   differing from each other and from both endpoints; equal samples mean a settled page.
+4. **Settled endpoint and a11y state** — final style after `await __adGateP`, plus `inert`/
+   `aria-hidden`, `mode`/`place`, and focus.
+5. **Reverse and repeat** — gesture back (Escape, reverse wheel, second click), then again: no stacked
+   tween, no drifted endpoint, no double-fire.
+6. **Cleanup and pause** — ticker/rAF stops and listeners release on view close; a frame later nothing
+   animates or logs.
+7. **Reduced motion and no-JS** — `prefers-reduced-motion: reduce` and `html[data-motion="off"]` land
+   on the still state; with scripts blocked the page still reads.
+
+## Completion record — required before "done"
+
+```text
+Requested effect:     <the task sentence, not a paraphrase>
+Actual wiring/input:  <CDP call or event that fired it; port and viewport>
+In-flight evidence:   <two sampled states with values and timing>
+Endpoint/cleanup:     <settled values, inert/aria-hidden, teardown observed>
+Reduced-motion/no-JS: <what the still path did and how it was forced>
+Viewport/visual:      <390x844, 768x1024, 1440x900 checked; screenshot reference>
+Performance trace:    <trace file, or NOT MEASURED>
+Regression:           <node tests/verify.mjs result, or why it is not warranted>
+Substitutions:        <each substituted or unverified effect, spelled out>
+```
 
 ## Reporting
 

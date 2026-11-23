@@ -24,7 +24,7 @@ beyond `node tests/verify.mjs`.
 - Re-read your own diff and confirm it is the smallest edit that satisfies the request.
 - `docs/qa-contract.md` says when `node tests/verify.mjs` is warranted — it is not, for docs-only work.
   Known baseline (2026-11-23): 111 passed, 0 failed, exit 0. Never hide a failure behind it.
-- State what you verified and what you did not. "UNVERIFIED" is an acceptable answer; a guess is not.
+- For UI/motion changes, completion requires live input-to-render evidence via cdp-qa-verify plus regression results; disclose every unverified or substituted effect.
 
 ## 4. Skills — read the matching one before the matching work
 

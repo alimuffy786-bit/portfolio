@@ -39,6 +39,35 @@ A bug is a claim about the running page. Diagnose it there, once, then fix one t
 - Timebox: if three measurements in a row change nothing, the hypothesis is wrong. Reset to step 2
   with the new information instead of escalating the size of the edit.
 
+## Large-file safe editing
+
+`index.html` is ~2,979 lines and `js/main.js` several thousand; a blind full-file rewrite destroys work.
+
+- Locate a unique anchor first: the `§`-banner, the function name with its section comment, or a
+  selector that appears once. Confirm the anchor is unique before replacing anything.
+- On a diff mismatch (old text missing, or matched twice): reread the current target range, then retry
+  **once** with a smaller, more unique anchor.
+- A second mismatch means the model of the file is wrong, not the anchor. Stop and diagnose: quote
+  what the range actually contains. Never fall back to rewriting the whole file.
+- After the edit, check the diff shape: `git diff --stat` plus the changed hunk's line count. A
+  one-line intent that produced a 200-line diff is a bug in the edit method.
+- Do not reformat, reorder script tags or normalise line endings as part of a surgical fix
+  (`tests/verify.mjs` is CRLF; the rest of the tree is LF).
+
+## Plan → Act handoff
+
+Write this block before the first edit of an Act step, so acting has nothing left to invent:
+
+```text
+Target effect:        <one sentence: observable before → after>
+Authorized files:     <exact paths + § owner / main.js section for each>
+Init/event path:      <the listener, state change or lifecycle that fires it>
+Dependency status:    <GSAP/Lenis/Draggable/Supabase present or feature-detected absent>
+Acceptance evidence:  <the measurement that proves it: hook, sample pair, viewport>
+Fallback/cleanup:     <reduced-motion path, teardown, inert/aria-hidden owner>
+Deferred:             <explicitly out of scope, with the reason>
+```
+
 ## Anti-patterns this repo punishes
 
 Stacked `console.log` debugging left in the tree; parallel state resurrected to "isolate" a problem;
