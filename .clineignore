@@ -1,0 +1,30 @@
+# .clineignore — paths Cline must not read, send to a model, or edit.
+# Absence from this list is not permission to edit; see .clinerules/core.md.
+
+# Vendored minified third-party builds — unreadable to a model, never hand-edited.
+js/Draggable.min.js
+js/lenis.min.js
+
+# Binary assets: fonts and photography. Cannot be reviewed as text; costs tokens.
+fonts/
+images/
+*.woff2
+*.webp
+*.png
+*.jpg
+*.ico
+
+# Test artifacts, browser profiles and logs written by tests/verify.mjs.
+.cdp-run/
+*.log
+
+# Tooling metadata and dependencies — not project source.
+.git/
+.vscode/
+node_modules/
+
+# Environment and credential files: never read, output, or paste into a prompt.
+.env
+.env.*
+*.pem
+*.key
