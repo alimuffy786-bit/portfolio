@@ -3410,12 +3410,13 @@ if (bingoWrap) {
     return !!((s && s.open) || (a && a.classList.contains('open')) || (l && l.classList.contains('open')));
   }
   // …and so does anything that reads the gesture itself. Checked on the event's own target, so a
-  // wheel over a field is a value change and stays one.
+  // wheel over a field is a value change and stays one, and a touch that lands on a hero sticker is
+  // Draggable's (the sticker is the one drag surface with `touch-action:none`) — never a gate swipe.
   function ownsGesture(ev){
     if (busy()) return true;
     const t = ev && ev.target;
     if (!t || !t.closest) return false;
-    return !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [data-lenis-prevent]');
+    return !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [data-lenis-prevent], .sticker');
   }
 
   // ONE TICK, ONE DECISION. `d` is +1 toward the contents and −1 toward the poster. A direction the
